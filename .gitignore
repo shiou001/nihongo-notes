@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+.playwright-mcp/
+# 由 build-data.mjs 產生的除錯用 JSON；網站只讀 data/content.js
+data/content.json

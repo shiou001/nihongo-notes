@@ -1,0 +1,14 @@
+{
+  "name": "nihongo-notes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "從 Notion 日文學習筆記長出來的手繪風複習網站",
+  "type": "module",
+  "scripts": {
+    "sync": "node sync/sync-notion.mjs",
+    "build": "node sync/build-data.mjs",
+    "test": "node --test sync/parse-notion-md.test.mjs sync/merge-progress.test.mjs",
+    "mock-sync": "node sync/mock-supabase.mjs",
+    "start": "python -m http.server 8080"
+  }
+}

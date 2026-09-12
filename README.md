@@ -1,0 +1,138 @@
+# にほんごノート 🍙
+
+從 Notion「🇯🇵 日文學習筆記」自動長出來的手繪風日文複習網站（雛形 v0.1）。
+
+- 📖 **筆記**：照 Notion 原本的 8 個分頁與表格呈現，可全文搜尋
+- ✏️ **複習測驗**：單字 / 讀音 / 句型 / 會話 / 五十音 四選一，優先出沒看過與常錯的
+- 🗺️ **學習地圖**：N5 → N1 每級目標、每週建議、Notion 單字數與熟練進度
+- 🈁 **五十音**：平假名 / 片假名切換，點一下會唸
+- 📡 **Notion 同步**：你只管更新 Notion，腳本定時把內容抓進來
+
+## 直接使用
+
+雙擊 `index.html` 就能用（不需要伺服器）。想用 localhost：
+
+```bash
+npm start
+```
+
+然後開 http://localhost:8080 。
+
+## 部署到 GitHub Pages（手機、其他電腦都能開）
+
+網址會是 `https://<你的帳號>.github.io/nihongo-notes/`。
+
+1. 到 https://github.com/new 建立 repo：名稱 `nihongo-notes`、**Public**、**不要**勾 Add README / .gitignore / license。
+2. 在這個資料夾執行（把 `<你的帳號>` 換掉）：
+   ```bash
+   git remote add origin https://github.com/<你的帳號>/nihongo-notes.git
+   git push -u origin main
+   ```
+   第一次會跳出瀏覽器要你登入 GitHub，照著按就好。
+3. repo 頁面 → **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**。
+4. 到 **Actions** 分頁，點「Sync Notion & Deploy Pages」→ **Run workflow**。跑完（約 1 分鐘）網址就能開了。
+
+之後在電腦上改完程式，`git add -A && git commit -m "..." && git push` 就會自動重新部署。
+
+## 從 Notion 同步
+
+1. 到 https://www.notion.so/my-integrations 建立一個 **Internal Integration**，複製 secret。
+2. 打開 Notion 的「🇯🇵 日文學習筆記」根頁面 → 右上角 `...` → **Connections** → 加入剛建立的 Integration（子頁面會自動繼承）。
+3. 設定環境變數後執行：
+
+```bash
+# PowerShell
+$env:NOTION_TOKEN = "ntn_xxxxxxxx"
+node sync/sync-notion.mjs
+```
+
+腳本會：抓所有子頁面 → 存成 `sync/cache/*.md` → 解析成 `data/content.js`（網站讀這個）。
+同步失敗時不會動到既有的 `data/content.js`。
+
+### 定時同步
+
+**方法 A：GitHub Actions（推薦，部署到 Pages 後零維護）**
+在 repo `Settings → Secrets and variables → Actions` 新增 `NOTION_TOKEN`。
+[.github/workflows/pages.yml](.github/workflows/pages.yml) 每天台灣時間 03:00 自動同步、commit、重新部署。沒設 token 時會略過同步，不會報錯。
+
+**方法 B：Windows 工作排程器（本機）**
+1. 建一個 `sync.cmd`：
+   ```
+   set NOTION_TOKEN=ntn_xxxxxxxx
+   cd /d "D:\CLAUDE D\nihongo-notes"
+   node sync\sync-notion.mjs
+   ```
+2. 工作排程器 → 建立基本工作 → 每天 → 動作「啟動程式」選這個 `.cmd`。
+
+## 跨裝置同步進度（Supabase + 同步碼）
+
+不用登入。第一台裝置產生一組同步碼（像 `torii-nzkq-udqt-em26`），其他裝置貼上同一組碼就會把進度合併在一起。
+
+**一次性設定（約 5 分鐘）**
+
+1. 到 https://supabase.com/dashboard → **New project**（Region 選 Northeast Asia (Tokyo)，Database password 隨便設一個記起來）。
+2. 專案建好後，左側 **SQL Editor** → **New query** → 把 [sync/supabase-schema.sql](sync/supabase-schema.sql) 整份貼上 → **Run**。應該看到 `Success. No rows returned`。
+3. 左側 **Project Settings → API**：複製 **Project URL** 與 **anon public** key，貼進 [data/sync-config.js](data/sync-config.js)。
+4. 重新整理網站，右上角會出現「☁️ 未連結」，點進去按「產生新的同步碼」。
+5. 其他裝置開同一個網站 → 右上角 ☁️ → 貼上同步碼 → 連結。
+
+**安全性**：資料表開了 Row Level Security 且沒有任何 policy，anon key 只能呼叫 `progress_get` / `progress_put` 兩個函式，而且函式只認同步碼的 SHA-256 雜湊。anon key 放在網頁裡是 Supabase 的正常用法。
+
+**合併規則**（[js/progress.js](js/progress.js) 的 `merge()`）：同一題以看過次數多的為準，一樣多取最後作答時間晚的；學習日期聯集；測驗紀錄以時間去重。兩台裝置離線各做各的，上線後不會互相蓋掉。
+
+**離線測試**：`node sync/mock-supabase.mjs` 會在 54321 埠起一個假端點，把 sync-config 暫時指過去就能不連 Supabase 測完整流程。
+
+## 只用快取重建（不連 Notion）
+
+```bash
+npm run build
+```
+
+## 測試解析器
+
+```bash
+npm test
+```
+
+（包含 Notion 解析器與進度合併規則兩組測試。）
+
+## 你可以自己改的地方 🖊️
+
+| 檔案 | 改什麼 |
+|---|---|
+| `data/plan.js` | N5 → N1 每級目標、週數、每週建議、里程碑 |
+| `js/quiz.js` 最上面的 `isMastered()` | 「什麼時候算背熟」的規則（預設連對 3 次） |
+| `css/style.css` 的 `:root` | 配色、字型 |
+
+## Notion 怎麼寫，網站就怎麼認
+
+解析器靠**表格表頭**判斷資料型態，新增內容時照這些欄位名稱寫就會自動進測驗：
+
+| 表頭 | 進入 |
+|---|---|
+| 單字 / 讀音 / 意思（可加 重音、例句） | 單字測驗；等級看最近的標題有沒有 `N5`~`N1` 或「二級」等，沒有就是「筆記」 |
+| 句型 / 意思 / 例句 | 文法測驗 |
+| 日語 / 羅馬字 / 中文（或 使用場合） | 會話測驗 |
+| 羅馬拼音 / 平假名 / 片假名 | 五十音 |
+| 項目 / 說明（敬語頁，一個 `###` 標題一句） | 會話測驗（敬語） |
+
+其他表格會照原樣出現在「筆記」裡，只是不會出題。
+
+## 專案結構
+
+```
+index.html           單頁應用入口
+css/style.css        手繪風樣式
+js/app.js            路由 + 各視圖
+js/quiz.js           出題引擎、熟練度規則
+js/progress.js       localStorage 進度 + 合併規則
+js/sync.js           跨裝置同步（Supabase RPC + 同步碼）
+data/sync-config.js  Supabase URL / anon key（可手改）
+sync/supabase-schema.sql  Supabase 建表與函式
+sync/mock-supabase.mjs    本機假端點，離線測同步
+js/doodles.js        手繪 SVG（達摩、櫻花、飯糰、鳥居、富士山、招財貓）
+data/content.js      ← 同步腳本產生（勿手改）
+data/plan.js         學習規劃（可手改）
+sync/                Notion 同步與解析
+docs/superpowers/specs/  設計文件
+```

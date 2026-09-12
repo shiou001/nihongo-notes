@@ -1,0 +1,78 @@
+# にほんごノート — 同步 Notion 並部署到 GitHub Pages
+#
+# 觸發時機：
+#   - push 到 main：直接部署（不同步 Notion）
+#   - 每天台灣時間 03:00：先從 Notion 同步，有變動就 commit，再部署
+#   - 手動：Actions 分頁 → 本 workflow → Run workflow
+#
+# 一次性設定：
+#   Settings → Pages → Source 選「GitHub Actions」
+#   （選用）Settings → Secrets and variables → Actions → New repository secret：NOTION_TOKEN
+#   沒設 NOTION_TOKEN 時會略過同步，只部署現有內容，不會失敗。
+name: Sync Notion & Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 19 * * *'   # UTC 19:00 = 台灣 03:00
+  workflow_dispatch:
+
+permissions:
+  contents: write     # 同步後 commit 回 repo
+  pages: write        # 部署 Pages
+  id-token: write     # deploy-pages 需要
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sync from Notion
+        if: github.event_name != 'push'
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_ROOT_PAGE_ID: 36dd7785-7287-819e-a17a-d9a1045dbdc3
+        run: |
+          if [ -z "$NOTION_TOKEN" ]; then
+            echo "::notice::尚未設定 NOTION_TOKEN，略過同步，只部署現有內容。"
+            exit 0
+          fi
+          node sync/sync-notion.mjs
+
+      - name: Run tests
+        run: node --test sync/parse-notion-md.test.mjs sync/merge-progress.test.mjs
+
+      - name: Commit synced notes
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "notion-sync-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data sync/cache
+          if git diff --cached --quiet; then
+            echo "Notion 沒有變動。"
+          else
+            git commit -m "chore: sync Notion notes $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

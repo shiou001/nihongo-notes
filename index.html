@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>にほんごノート — 日文學習專區</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='55' r='38' fill='%23e06c6c'/><circle cx='50' cy='55' r='22' fill='%23fdf1e2'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kurenaido&family=Klee+One:wght@400;600&family=Patrick+Hand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=0.2">
+</head>
+<body>
+  <div id="petals" aria-hidden="true"></div>
+
+  <header class="top">
+    <a class="logo" href="#/">
+      <span class="logo-mark"></span>
+      <span class="logo-text">にほんご<b>ノート</b></span>
+    </a>
+    <nav class="top">
+      <a href="#/" data-view="home">🏠 首頁</a>
+      <a href="#/map" data-view="map">🗺️ 學習地圖</a>
+      <a href="#/notes/0" data-view="notes">📖 筆記</a>
+      <a href="#/quiz" data-view="quiz">✏️ 測驗</a>
+      <a href="#/kana" data-view="kana">🈁 五十音</a>
+      <a href="#/sync" data-view="sync" id="sync-pill" class="sync-pill" hidden>☁️</a>
+    </nav>
+  </header>
+
+  <main id="app"></main>
+
+  <footer>
+    <p>資料來源：我的 Notion「🇯🇵 日文學習筆記」・ <a href="#/sync">☁️ 跨裝置同步</a> ・ 手繪風雛形 v0.2</p>
+  </footer>
+
+  <script src="data/content.js?v=0.2"></script>
+  <script src="data/plan.js?v=0.2"></script>
+  <script src="js/doodles.js?v=0.2"></script>
+  <script src="js/progress.js?v=0.2"></script>
+  <script src="data/sync-config.js?v=0.2"></script>
+  <script src="js/sync.js?v=0.2"></script>
+  <script src="js/quiz.js?v=0.2"></script>
+  <script src="js/app.js?v=0.2"></script>
+</body>
+</html>
