@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parsePageMarkdown, buildContent } from './parse-notion-md.mjs';
+import { parsePageMarkdown, buildContent, stripInline } from './parse-notion-md.mjs';
+import { richText, absoluteHref } from './notion-richtext.mjs';
 
 const cacheDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cache');
 const files = (await readdir(cacheDir)).filter(f => f.endsWith('.md'));
@@ -66,4 +67,38 @@ test('五十音：46 清音 + 濁音 + 拗音', () => {
 test('每個 id 唯一', () => {
   const ids = [...content.vocab, ...content.grammar, ...content.phrases, ...content.kana].map(x => x.id);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+// ---- Notion rich_text → Markdown ----
+const rt = (plain_text, extra = {}) => ({ type: 'text', plain_text, annotations: {}, href: null, ...extra });
+
+test('一般文字連結會保留（以前只保留 mention）', () => {
+  assert.equal(richText([rt('看這裡', { href: 'https://example.com/a' })]), '[看這裡](https://example.com/a)');
+});
+
+test('Notion 內部相對路徑補成完整網址', () => {
+  assert.equal(absoluteHref('/36fd77857287818a97cdc3cd708e37be'), 'https://www.notion.so/36fd77857287818a97cdc3cd708e37be');
+  assert.equal(richText([rt('文法筆記', { type: 'mention', href: '/36fd7785' })]), '[文法筆記](https://www.notion.so/36fd7785)');
+});
+
+test('粗體、粗體連結、看不懂的連結', () => {
+  assert.equal(richText([rt('私'), rt('は', { annotations: { bold: true } })]), '私**は**');
+  assert.equal(richText([rt('重點', { annotations: { bold: true }, href: 'https://x.io' })]), '[**重點**](https://x.io)');
+  assert.equal(richText([rt('怪', { href: 'javascript:alert(1)' })]), '怪');
+  assert.equal(richText([rt(''), { plain_text: undefined }]), '');
+});
+
+test('出題欄位會拿掉連結和粗體標記，只留文字', () => {
+  assert.equal(stripInline('[**綺麗**](https://www.notion.so/abc)（な）'), '綺麗（な）');
+  assert.equal(stripInline('私**は**学生'), '私は学生');
+});
+
+test('表格裡帶連結的單字，進測驗時是乾淨的文字', () => {
+  const md = ['---', 'id: t', 'title: 測試', '---', '## 🌟 N5', '<table header-row="true">',
+    '<tr><td>單字</td><td>讀音</td><td>意思</td></tr>',
+    '<tr><td>[水](https://www.notion.so/x)</td><td>みず</td><td>**水**</td></tr>', '</table>'].join('\n');
+  const c = buildContent([md]);
+  assert.equal(c.vocab[0].word, '水');
+  assert.equal(c.vocab[0].meaning, '水');
+  assert.equal(c.vocab[0].level, 'N5');
 });

@@ -30,9 +30,13 @@ export function parseFrontMatter(md) {
   return { meta, body: md.slice(m[0].length) };
 }
 
-function stripInline(s) {
-  // 移除 **粗體** 標記，保留文字（前端另外處理粗體顯示）
-  return s.replace(/\*\*(.+?)\*\*/g, '$1').trim();
+// 移除 **粗體** 與 [文字](連結) 標記，只留文字。
+// 用在單字、意思這類會出成測驗題的欄位；筆記頁面顯示時前端另外把它們畫成粗體和連結。
+export function stripInline(s) {
+  return String(s ?? '')
+    .replace(/\[([^\]]+)\]\((?:https?:\/\/|\/)[^)]*\)/g, '$1')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .trim();
 }
 
 function parseTable(html) {

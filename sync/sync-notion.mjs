@@ -12,6 +12,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { buildFromCache } from './build-data.mjs';
+import { richText } from './notion-richtext.mjs';
 
 const TOKEN = process.env.NOTION_TOKEN;
 const ROOT = (process.env.NOTION_ROOT_PAGE_ID || '36dd7785-7287-819e-a17a-d9a1045dbdc3').replace(/-/g, '');
@@ -43,14 +44,6 @@ async function children(blockId) {
   return out;
 }
 
-function richText(rt = []) {
-  return rt.map(t => {
-    let s = t.plain_text;
-    if (t.annotations?.bold) s = `**${s}**`;
-    if (t.href && t.type === 'mention') s = `[${s}](${t.href})`;
-    return s;
-  }).join('');
-}
 
 // Notion blocks → 我們的簡易 Markdown（與 parse-notion-md.mjs 對應）
 async function blocksToMarkdown(blocks, depth = 0) {
