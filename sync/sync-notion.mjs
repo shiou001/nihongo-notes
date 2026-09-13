@@ -1,7 +1,8 @@
 // sync-notion.mjs — 從 Notion API 抓取「日文學習筆記」根頁面下所有子頁面 → Markdown 快取 → data/content.js
 //
 // 需要環境變數：
-//   NOTION_TOKEN         Notion Internal Integration 的 secret（ntn_... 或 secret_...）
+//   NOTION_TOKEN         Notion 個人存取權杖（https://www.notion.so/developers/tokens，ntn_ 開頭）
+//                        舊式 Internal Integration 的 secret 也可以，但要另外把頁面 Add connections 給它
 //   NOTION_ROOT_PAGE_ID  根頁面 id（預設：36dd7785-7287-819e-a17a-d9a1045dbdc3）
 //
 // 用法：node sync/sync-notion.mjs
@@ -19,7 +20,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const cacheDir = path.join(here, 'cache');
 
 if (!TOKEN) {
-  console.error('❌ 缺少 NOTION_TOKEN 環境變數。請先到 https://www.notion.so/my-integrations 建立 Integration，並把「日文學習筆記」頁面 Share 給它。');
+  console.error('❌ 缺少 NOTION_TOKEN 環境變數。請到 https://www.notion.so/developers/tokens 建立個人存取權杖（ntn_ 開頭）後設定。');
   process.exit(1);
 }
 
@@ -92,7 +93,7 @@ async function main() {
   console.log('🔄 讀取 Notion 根頁面…');
   const rootBlocks = await children(ROOT);
   const childPages = rootBlocks.filter(b => b.type === 'child_page');
-  if (!childPages.length) throw new Error('根頁面下找不到子頁面，請確認頁面已 Share 給 Integration。');
+  if (!childPages.length) throw new Error('根頁面下找不到子頁面。請確認 NOTION_ROOT_PAGE_ID 正確；若用的是舊式 Internal Integration 權杖，還要在頁面 ••• → Add connections 把它加進去。');
   await mkdir(cacheDir, { recursive: true });
 
   for (const cp of childPages) {

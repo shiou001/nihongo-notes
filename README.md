@@ -36,9 +36,11 @@ npm start
 
 ## 從 Notion 同步
 
-1. 到 https://www.notion.so/my-integrations 建立一個 **Internal Integration**，複製 secret。
-2. 打開 Notion 的「🇯🇵 日文學習筆記」根頁面 → 右上角 `...` → **Connections** → 加入剛建立的 Integration（子頁面會自動繼承）。
-3. 設定環境變數後執行：
+1. 到 https://www.notion.so/developers/tokens → **New token** → 取個名字 → 能力勾 **Notion API** → **Create token**，複製那串 `ntn_` 開頭的權杖。
+   這是「個人存取權杖」，直接以你本人的身分讀取，你看得到的頁面它都能讀，**不需要**再把頁面連給 integration。
+   也因此權限比較大，權杖只放在 GitHub Secrets 或自己電腦的環境變數，不要貼到任何檔案裡。
+2. 放到 GitHub：repo → **Settings → Secrets and variables → Actions → New repository secret**，Name 填 `NOTION_TOKEN`，Secret 貼權杖。之後每天凌晨三點會自動同步。
+3. 想在自己電腦手動同步，設定環境變數後執行：
 
 ```bash
 # PowerShell
