@@ -84,6 +84,16 @@ node sync/sync-notion.mjs
 
 **離線測試**：`node sync/mock-supabase.mjs` 會在 54321 埠起一個假端點，把 sync-config 暫時指過去就能不連 Supabase 測完整流程。
 
+## 外部公開單字（JLPT N5、N4）
+
+除了你的 Notion 筆記，網站還內建一份公開的 JLPT 單字表，N5 約 718 字、N4 約 668 字。
+
+- **來源**：[tanos.co.uk](http://www.tanos.co.uk/jlpt/) 的 JLPT 單字表（CC BY），經 [open-anki-jlpt-decks](https://github.com/jamsinclair/open-anki-jlpt-decks) 整理（MIT）。
+- **中文**：原始資料只有英文，中文是 AI 翻譯，網站上會標示，答題後會顯示英文原文。
+- **和 Notion 的關係**：同一個字、同讀音、同等級，以你 Notion 的版本為準。外部單字不會寫進 Notion。
+- **怎麼用**：測驗設定裡的「單字來源」可以只考筆記、只考公開單字，或兩種都考。筆記頁多了「🌐 JLPT 公開單字」可以瀏覽和搜尋。
+- **修正翻譯或加更多等級**：看 [sync/external/README.md](sync/external/README.md)。
+
 ## 只用快取重建（不連 Notion）
 
 ```bash

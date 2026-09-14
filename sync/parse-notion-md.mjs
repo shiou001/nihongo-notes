@@ -102,7 +102,7 @@ export function parsePageMarkdown(md) {
 
 // ---------- 第二層：pages → vocab / grammar / phrases / kana ----------
 
-function hashId(str) {
+export function hashId(str) {
   // 穩定短 id（FNV-1a），給 localStorage 進度用
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }

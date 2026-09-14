@@ -47,7 +47,7 @@
     </section>
 
     <section class="stats">
-      <div class="stat card tape"><div class="num">${o.vocab}</div><div class="lbl">Notion 單字</div>${doodle('onigiri')}</div>
+      <div class="stat card tape"><div class="num">${o.vocab}</div><div class="lbl">單字 <small>筆記 ${o.notionVocab}・公開 ${o.externalVocab}</small></div>${doodle('onigiri')}</div>
       <div class="stat card tape"><div class="num">${o.mastered}</div><div class="lbl">已熟練</div>${doodle('star')}</div>
       <div class="stat card tape"><div class="num">${Progress.streakDays()}</div><div class="lbl">連續學習天</div>${doodle('torii')}</div>
       <div class="stat card tape"><div class="num">${o.weak}</div><div class="lbl">弱點待複習</div>${doodle('cloud')}</div>
@@ -88,7 +88,7 @@
         <div class="card map-card">
           <div class="map-head">
             <div class="map-mascot">${doodle(p.mascot)}</div>
-            <div><h2>${p.level} <small>${esc(p.title)}</small></h2><p class="meta">建議 ${p.weeks} 週 ・ Notion 內 ${s.total} 個單字</p></div>
+            <div><h2>${p.level} <small>${esc(p.title)}</small></h2><p class="meta">建議 ${p.weeks} 週 ・ ${s.total} 個單字（筆記 ${s.notion}・公開 ${s.external}）</p></div>
           </div>
           <p>${esc(p.goal)}</p>
           <div class="bar"><div class="fill" style="width:${s.pct}%;background:${p.color}"></div></div>
@@ -183,6 +183,7 @@
     const levels = (params.get('levels') || '').split(',').filter(Boolean);
     const types = (params.get('types') || 'vocab_meaning,vocab_reading').split(',').filter(Boolean);
     const weak = params.get('weak') === '1';
+    const origins = (params.get('origins') || '').split(',').filter(Boolean);
     const chip = (name, val, label, on) => `<label class="chip ${on ? 'on' : ''}"><input type="checkbox" name="${name}" value="${val}" ${on ? 'checked' : ''}>${label}</label>`;
     const o = Quiz.overallStats();
     return `
@@ -193,6 +194,9 @@
       <h3>單字等級（只影響單字題）</h3>
       <div class="chips">${Quiz.LEVELS.map(l => { const s = Quiz.levelStats(l); return chip('levels', l, `${l} <small>${s.mastered}/${s.total}</small>`, levels.includes(l)); }).join('')}</div>
       <p class="meta">不勾等級 = 全部單字</p>
+      <h3>單字來源</h3>
+      <div class="chips">${chip('origins', 'notion', `📓 我的筆記 <small>${o.notionVocab}</small>`, origins.includes('notion'))}${chip('origins', 'external', `🌐 公開單字 <small>${o.externalVocab}</small>`, origins.includes('external'))}</div>
+      <p class="meta">不勾來源 = 兩種都出。公開單字的中文是 AI 翻譯。</p>
       <h3>題數</h3>
       <div class="chips">${[10, 20, 30].map(n => `<label class="chip ${n === 10 ? 'on' : ''}"><input type="radio" name="count" value="${n}" ${n === 10 ? 'checked' : ''}>${n} 題</label>`).join('')}</div>
       <label class="chip ${weak ? 'on' : ''}"><input type="checkbox" name="weak" ${weak ? 'checked' : ''}>只出弱點題（目前 ${o.weak} 個）</label>
@@ -235,7 +239,9 @@
       b.disabled = true;
     });
     const it = q.item;
-    const extra = [it.reading && it.reading !== q.prompt ? `讀音：${esc(it.reading)}` : '', it.example ? `例句：${esc(it.example)}` : '', it.usage ? `用法：${esc(it.usage)}` : '', it.source ? `<span class="meta">出處：${esc(it.source)}</span>` : ''].filter(Boolean).join('<br>');
+    const extra = [it.reading && it.reading !== q.prompt ? `讀音：${esc(it.reading)}` : '',
+      it.meaningEn && it.meaningEn !== it.meaning ? `英文：${esc(it.meaningEn)}${it.ai ? ' <span class="tag">AI 翻譯</span>' : ''}` : '',
+      it.example ? `例句：${esc(it.example)}` : '', it.usage ? `用法：${esc(it.usage)}` : '', it.source ? `<span class="meta">出處：${esc(it.source)}</span>` : ''].filter(Boolean).join('<br>');
     $('#feedback').innerHTML = `<div class="card ${ok ? 'good' : 'bad'}">${ok ? window.DOODLES.checkmark + '<b>正解！すごい！</b>' : window.DOODLES.cross + `<b>答案是：${esc(q.answer)}</b>`}<div class="extra">${extra}</div>
       <button class="btn primary" id="next">${quiz.i + 1 < quiz.qs.length ? '下一題 →' : '看結果 🎉'}</button></div>`;
     $('#next').focus();
@@ -360,8 +366,9 @@
     if (e.target.id !== 'quiz-setup') return;
     e.preventDefault();
     const f = new FormData(e.target);
-    const opts = { types: f.getAll('types'), levels: f.getAll('levels'), count: +f.get('count') || 10, weakOnly: f.get('weak') === 'on' };
-    startQuiz(opts, (opts.weakOnly ? '弱點 ' : '') + (opts.levels.join('+') || '全部'));
+    const opts = { types: f.getAll('types'), levels: f.getAll('levels'), origins: f.getAll('origins'), count: +f.get('count') || 10, weakOnly: f.get('weak') === 'on' };
+    const originLabel = opts.origins.length === 1 ? (opts.origins[0] === 'notion' ? '筆記 ' : '公開 ') : '';
+    startQuiz(opts, (opts.weakOnly ? '弱點 ' : '') + originLabel + (opts.levels.join('+') || '全部'));
   });
   document.addEventListener('click', e => {
     const c = e.target.closest('.choice'); if (c) return answer(+c.dataset.i);

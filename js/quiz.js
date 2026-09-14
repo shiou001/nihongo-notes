@@ -33,11 +33,13 @@ window.Quiz = (() => {
 
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-  function poolFor(typeKey, levels) {
+  // origins：['notion'] 只出你的筆記、['external'] 只出公開單字，空的就兩種都出（只影響單字題）
+  function poolFor(typeKey, levels, origins) {
     const t = TYPES[typeKey];
     let items = D()[t.pool] || [];
     if (t.filter) items = items.filter(t.filter);
     if (t.pool === 'vocab' && levels?.length) items = items.filter(v => levels.includes(v.level));
+    if (t.pool === 'vocab' && origins?.length) items = items.filter(v => origins.includes(v.origin || 'notion'));
     return items;
   }
 
@@ -64,7 +66,7 @@ window.Quiz = (() => {
     const candidates = [];
     for (const tk of types) {
       const t = TYPES[tk];
-      let items = poolFor(tk, opts.levels);
+      let items = poolFor(tk, opts.levels, opts.origins);
       if (opts.weakOnly) items = items.filter(x => isWeak(Progress.stat(x.id)));
       for (const it of items) candidates.push({ tk, it });
     }
@@ -79,7 +81,7 @@ window.Quiz = (() => {
     return shuffle(chosen).map(({ tk, it }) => {
       const t = TYPES[tk];
       const answer = t.answer(it);
-      const choices = shuffle([answer, ...pickDistractors(it, poolFor(tk, opts.levels), t)]);
+      const choices = shuffle([answer, ...pickDistractors(it, poolFor(tk, opts.levels, opts.origins), t)]);
       return { id: it.id, type: tk, typeLabel: t.label, prompt: t.prompt(it), sub: t.sub(it), answer, choices, item: it };
     });
   }
@@ -90,14 +92,16 @@ window.Quiz = (() => {
     const mastered = words.filter(v => isMastered(Progress.stat(v.id))).length;
     const seen = words.filter(v => Progress.stat(v.id).seen > 0).length;
     const weak = words.filter(v => isWeak(Progress.stat(v.id))).length;
-    return { total: words.length, mastered, seen, weak, pct: words.length ? Math.round(mastered / words.length * 100) : 0 };
+    const external = words.filter(v => v.origin === 'external').length;
+    return { total: words.length, notion: words.length - external, external, mastered, seen, weak, pct: words.length ? Math.round(mastered / words.length * 100) : 0 };
   }
 
   function overallStats() {
     const all = [...D().vocab, ...D().grammar, ...D().phrases, ...D().kana];
     const mastered = all.filter(x => isMastered(Progress.stat(x.id))).length;
     const weak = all.filter(x => isWeak(Progress.stat(x.id))).length;
-    return { total: all.length, vocab: D().vocab.length, mastered, weak };
+    const externalVocab = D().vocab.filter(v => v.origin === 'external').length;
+    return { total: all.length, vocab: D().vocab.length, notionVocab: D().vocab.length - externalVocab, externalVocab, mastered, weak };
   }
 
   return { TYPES, LEVELS, isMastered, isWeak, buildQuestions, levelStats, overallStats };
