@@ -107,6 +107,19 @@ node sync/sync-notion.mjs
 
 資料來源與更新方式看 [sync/external/README.md](sync/external/README.md)。讀音對齊的規則在 [js/kanji-align.js](js/kanji-align.js)。
 
+## 🔊 聲音
+
+網站用瀏覽器內建的語音朗讀，聲音好不好聽取決於裝置。[js/voice.js](js/voice.js) 會自動挑最自然的日文聲音，頁尾的「🔊 聲音」可以自己換聲音、選語氣，每個聲音都能先試聽。
+
+| 裝置 | 推薦聲音 |
+|---|---|
+| 電腦用 Edge | Microsoft Nanami Online (Natural)，最像真人、也最可愛，需要網路 |
+| 電腦用 Chrome | Google 日本語，需要網路 |
+| iPhone | 到系統設定下載 O-ren 或 Kyoko 的「加強版」 |
+| Android | Google 語音服務的日文語音 |
+
+名字有 Desktop、Haruka、Ayumi、Ichiro 的是 Windows 內建的舊聲音，最像機器人。語氣有「可愛」「自然」「慢慢說」三種，預設是可愛。設定只存在該裝置，不會跨裝置同步。
+
 ## 只用快取重建（不連 Notion）
 
 ```bash

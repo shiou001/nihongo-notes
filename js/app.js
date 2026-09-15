@@ -168,15 +168,12 @@
         <a class="btn small ${mode === 'hira' ? 'primary' : ''}" href="#/kana/hira">平假名</a>
         <a class="btn small ${mode === 'kata' ? 'primary' : ''}" href="#/kana/kata">片假名</a>
         <a class="btn small" href="#/quiz?types=kana">✏️ 假名測驗</a>
-        <span class="meta">點一下假名會唸給你聽 🔊</span>
+        <span class="meta">點一下假名會唸給你聽 🔊 <a href="#/voice">換聲音</a></span>
       </div>
     </section>${html}`;
   }
-  function speak(text) {
-    if (!('speechSynthesis' in window)) return;
-    const u = new SpeechSynthesisUtterance(text); u.lang = 'ja-JP'; u.rate = 0.9;
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
-  }
+  // 朗讀交給 js/voice.js：自動挑最自然的聲音，並套用你在「🔊 聲音」頁選的聲音和語氣
+  function speak(text) { if (window.Voice) Voice.speak(text); }
 
   // ────────────────────────────── 測驗 ──────────────────────────────
   const quiz = { qs: [], i: 0, score: 0, answered: false, mode: '', wrong: [] };
@@ -208,6 +205,7 @@
       <div class="chips">${[10, 20, 30].map(n => `<label class="chip ${n === 10 ? 'on' : ''}"><input type="radio" name="count" value="${n}" ${n === 10 ? 'checked' : ''}>${n} 題</label>`).join('')}</div>
       <label class="chip ${weak ? 'on' : ''}"><input type="checkbox" name="weak" ${weak ? 'checked' : ''}>只出弱點題（目前 ${o.weak} 個）</label>
       <div class="actions"><button class="btn primary big">開始！いってきます 🏃</button></div>
+      <p class="meta">🔊 覺得發音太像機器人？<a href="#/voice">換一個聲音</a></p>
     </form>`;
   }
 
@@ -342,6 +340,44 @@
     <section class="card"><div class="kj-grid">${list.map(cell).join('')}</div></section>`;
   }
 
+  // ────────────────────────────── 語音設定 ──────────────────────────────
+  const VOICE_SAMPLE = 'こんにちは！きょうも いっしょに がんばろうね。';
+  const VOICE_HELP = `
+      <h3>想要更自然的聲音？</h3>
+      <ul>
+        <li><b>電腦用 Edge</b>：會有「Microsoft Nanami Online (Natural)」，最像真人、也最可愛，需要網路。</li>
+        <li><b>電腦用 Chrome</b>：選「Google 日本語」，需要網路。</li>
+        <li><b>iPhone</b>：設定 → 輔助使用 → 朗讀內容 → 聲音 → 日文，下載「O-ren（加強版）」或「Kyoko（加強版）」。</li>
+        <li><b>Android</b>：設定 → 文字轉語音輸出，安裝 Google 語音服務的日文語音。</li>
+      </ul>
+      <p class="meta">名字裡有 Desktop、Haruka、Ayumi、Ichiro 的是 Windows 內建的舊聲音，最像機器人。</p>`;
+  function viewVoice() {
+    const V = window.Voice;
+    const head = '<section class="page-head"><h1>🔊 聲音</h1><p class="lead">挑一個你喜歡的聲音和語氣。設定只存在這台裝置，因為每台裝置能用的聲音不一樣。</p></section>';
+    if (!V || !V.supported()) return `${head}<div class="card"><p>這個瀏覽器不支援語音朗讀，換 Chrome、Edge 或 Safari 試試看。</p></div>`;
+    const list = V.voices(), cur = V.current(), st = V.settings();
+    if (!list.length) return `${head}<div class="card"><h2>還沒找到日文聲音</h2><p>聲音清單可能還在載入，等一下會自動出現。如果一直是空的，代表這台裝置沒有日文語音，唸出來會很怪或沒有聲音。</p>${VOICE_HELP}</div>`;
+    return `${head}
+    <div class="card tape">
+      <h2>語氣</h2>
+      <div class="chips">${Object.entries(V.PRESETS).map(([k, p]) => `<button type="button" class="chip ${st.preset === k ? 'on' : ''}" data-voice-preset="${k}">${p.label}</button>`).join('')}</div>
+      <form id="voice-test" class="search"><input name="text" value="${esc(VOICE_SAMPLE)}" aria-label="試聽句子"><button class="btn small primary">▶ 試聽</button></form>
+      <p class="meta">目前：${esc(cur?.name || '—')}</p>
+    </div>
+    <div class="card">
+      <h2>聲音 <small>這台裝置有 ${list.length} 個日文聲音</small></h2>
+      <ul class="voice-list">${list.map((v, i) => `
+        <li class="${cur && v.name === cur.name ? 'on' : ''}">
+          <button type="button" class="btn tiny" data-voice-try="${i}" aria-label="試聽 ${esc(v.name)}">▶</button>
+          <span class="vname">${esc(v.name)}</span>
+          ${V.isRecommended(v) ? '<span class="tag">⭐ 推薦</span>' : ''}${v.localService ? '' : '<span class="tag net">需要網路</span>'}
+          ${cur && v.name === cur.name ? '<span class="tag in-use">使用中</span>' : `<button type="button" class="btn tiny" data-voice-use="${i}">用這個</button>`}
+        </li>`).join('')}</ul>
+    </div>
+    <div class="card">${VOICE_HELP}</div>`;
+  }
+  const voiceText = () => document.querySelector('#voice-test input')?.value || VOICE_SAMPLE;
+
   // ────────────────────────────── 跨裝置同步 ──────────────────────────────
   function viewSync(msg = '') {
     if (!Sync.enabled()) {
@@ -414,6 +450,7 @@
       case 'notes': app().innerHTML = viewNotes(seg[1], params.get('q') || ''); break;
       case 'kana': app().innerHTML = viewKana(seg[1] || 'hira'); break;
       case 'sync': app().innerHTML = viewSync(); break;
+      case 'voice': app().innerHTML = viewVoice(); break;
       // 等級也要解碼：「其他」在網址裡會變成 %E5%85%B6%E4%BB%96
       case 'kanji': app().innerHTML = viewKanji(decodeURIComponent(seg[1] || ''), decodeURIComponent(seg[2] || '')); break;
       case 'quiz':
@@ -424,6 +461,7 @@
   }
 
   document.addEventListener('submit', e => {
+    if (e.target.id === 'voice-test') { e.preventDefault(); return speak(e.target.text.value); }
     if (e.target.id === 'link-form') {
       e.preventDefault();
       const code = e.target.code.value;
@@ -444,7 +482,14 @@
     if (e.target.closest('#sync-now')) return syncAction(() => Sync.pull(), '✅ 同步完成。');
     if (e.target.closest('#unlink')) { if (confirm('這台裝置會停止同步（本機進度保留，雲端資料也還在）。確定？')) { Sync.unlink(); app().innerHTML = viewSync('已斷開。'); } return; }
     if (e.target.closest('#copy-code')) { navigator.clipboard?.writeText($('#synccode-text').textContent).then(() => { $('#copy-code').textContent = '✅ 已複製'; }); return; }
-    const chip = e.target.closest('.chip'); if (chip) setTimeout(() => chip.classList.toggle('on', chip.querySelector('input').checked), 0);
+    const vp = e.target.closest('[data-voice-preset]');
+    if (vp) { Voice.set({ preset: vp.dataset.voicePreset }); const t = voiceText(); app().innerHTML = viewVoice(); return speak(t); }
+    const vt = e.target.closest('[data-voice-try]');
+    if (vt) return Voice.speak(voiceText(), { voice: Voice.voices()[+vt.dataset.voiceTry] });
+    const vu = e.target.closest('[data-voice-use]');
+    if (vu) { Voice.set({ name: Voice.voices()[+vu.dataset.voiceUse]?.name || '' }); const t = voiceText(); app().innerHTML = viewVoice(); return speak(t); }
+    const chip = e.target.closest('.chip');
+    if (chip) setTimeout(() => { const input = chip.querySelector('input'); if (input) chip.classList.toggle('on', input.checked); }, 0);
   });
   document.addEventListener('keydown', e => {
     if (!quiz.qs.length || !$('.choice')) return;
@@ -456,6 +501,8 @@
   window.addEventListener('DOMContentLoaded', () => {
     document.body.insertAdjacentHTML('beforeend', window.DOODLES.wobbleFilter);
     Sync.init();
+    // 聲音清單是非同步載入的：在聲音頁的話，載好後重畫
+    window.Voice?.onVoicesChanged(() => { if (location.hash.startsWith('#/voice')) app().innerHTML = viewVoice(); });
     Sync.onStatus(() => { if (location.hash.startsWith('#/sync')) { /* 狀態列已由 pill 更新；頁面等下次操作再重畫 */ } });
     // 櫻花花瓣
     const petals = $('#petals');
