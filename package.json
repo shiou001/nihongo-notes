@@ -7,8 +7,9 @@
   "scripts": {
     "sync": "node sync/sync-notion.mjs",
     "build": "node sync/build-data.mjs",
-    "test": "node --test sync/parse-notion-md.test.mjs sync/merge-progress.test.mjs sync/build-external.test.mjs",
+    "test": "node --test sync/parse-notion-md.test.mjs sync/merge-progress.test.mjs sync/build-external.test.mjs sync/build-kanji.test.mjs",
     "build:external": "node sync/build-external.mjs",
+    "build:kanji": "node sync/build-kanji.mjs",
     "mock-sync": "node sync/mock-supabase.mjs",
     "start": "python -m http.server 8080"
   }

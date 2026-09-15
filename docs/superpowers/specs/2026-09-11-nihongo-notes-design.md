@@ -136,6 +136,24 @@ nihongo-notes/
 
 已知限制：兩台裝置「同時」上傳會 last-write-wins（但各自下一次 pull 會再合併回來）；同步碼外洩等於進度外洩，重新產生新碼即可。
 
-## 11. 之後可擴充
+## 11. 外部公開單字（v0.3，2026-09-14）
 
-- 間隔重複（SRS）排程、聽力（TTS）、手寫假名練習、每日打卡。
+- JLPT N5、N4 單字 1386 個，來自 tanos.co.uk（CC BY）經 jamsinclair/open-anki-jlpt-decks 整理。
+- 中文解釋由 AI 翻成繁體中文，存在 `sync/external/zh-tw.*.tsv`，網站標示「AI 翻譯」並顯示英文原文。
+- `sync/build-external.mjs` 產生 `data/external.js`；`js/data-merge.js` 在瀏覽器合併，同字同讀音同級以 Notion 為準。
+- 測驗新增「單字來源」篩選。
+
+## 12. 漢字專區（v0.4，2026-09-15）
+
+決策：使用者是中文母語者，不做字義教學和寫字練習，只練讀音。使用者選了「字的讀音」和「詞裡的讀音」兩種模式，範圍 N5–N1 全部。
+
+- **資料**：KANJIDIC（CC BY-SA 4.0）經 kanji-data 整理，排除 WaniKani 欄位 → `sync/external/kanjidic/jlpt-kanji.json`。OpenCC `JPShinjitaiCharacters.txt`（Apache-2.0）提供日本字形對繁體的對照。`sync/build-kanji.mjs` 產生 `data/kanji.js`。
+- **表外常用字**：tanos 的 JLPT 漢字表漏了「分」這類常用字，導致「自分、半分、分かる」對不齊。解法是另外保留 KANJIDIC grade 1–8 的常用漢字 172 個，存成 `extra`、等級標為「其他」，只用來對齊，不捏造 JLPT 等級。有出現在單字裡的才顯示在漢字頁「其他」分頁，目前 18 個。對齊率由 93% 提升到 96%，詞裡的讀音題 1659 題。
+- **讀音對齊** `js/kanji-align.js`：回溯搜尋，把詞的讀音切給每個漢字。候選讀音是音讀、訓讀詞幹、詞幹加部分送假名，再加連濁、半濁音、促音變化，「々」沿用上一個字。對不齊的詞列為特殊讀法，不出題。在瀏覽器執行，Notion 每天同步後會自動跟上。
+- **題型**：`kanji_on`、`kanji_kun`（id 加 `:on`、`:kun` 分開記進度）、`kanji_word`（詞裡的讀音）。題型可指定 `distractors`、`conflict`、`id`、`promptHtml`、`detail`。`conflict` 用來排除「其實也對」的干擾選項。
+- **畫面**：`#/kanji/<等級>/<字>`，字格顏色代表熟練狀態；學習地圖每級加漢字進度；頁尾註明 KANJIDIC 與 OpenCC。
+
+## 13. 之後可擴充
+
+- 日本字形辨識題（氣→気）、同形異義詞（手紙＝信）、聲旁規律（青→晴清精請都唸 せい）。
+- N3–N1 單字、Tatoeba 例句、間隔重複（SRS）排程。

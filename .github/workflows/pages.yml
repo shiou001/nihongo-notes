@@ -53,7 +53,7 @@ jobs:
           node sync/sync-notion.mjs
 
       - name: Run tests
-        run: node --test sync/parse-notion-md.test.mjs sync/merge-progress.test.mjs sync/build-external.test.mjs
+        run: node --test sync/parse-notion-md.test.mjs sync/merge-progress.test.mjs sync/build-external.test.mjs sync/build-kanji.test.mjs
 
       - name: Commit synced notes
         if: github.event_name != 'push'

@@ -81,6 +81,7 @@
   function viewMap() {
     const cards = PLAN().map((p, i) => {
       const s = Quiz.levelStats(p.level);
+      const ks = Quiz.kanjiStats(p.level);
       const done = s.total && s.pct >= 80;
       return `
       <li class="map-node ${i % 2 ? 'right' : 'left'} ${done ? 'done' : ''}">
@@ -93,6 +94,7 @@
           <p>${esc(p.goal)}</p>
           <div class="bar"><div class="fill" style="width:${s.pct}%;background:${p.color}"></div></div>
           <p class="meta">熟練 ${s.mastered}／看過 ${s.seen}／弱點 ${s.weak}${done ? ' ・ 🎉 已達標' : ''}</p>
+          ${ks.total ? `<p class="meta">🀄 <a href="#/kanji/${p.level}">漢字 ${ks.total} 字</a>，熟練 ${ks.mastered}</p><div class="bar thin"><div class="fill" style="width:${ks.pct}%;background:${p.color}"></div></div>` : ''}
           <details><summary>每週重點與里程碑</summary>
             <ul class="todo">${p.weekly.map(w => `<li>${esc(w)}</li>`).join('')}</ul>
             <ul class="milestones">${p.milestones.map(m => `<li>🏁 ${esc(m)}</li>`).join('')}</ul>
@@ -191,9 +193,14 @@
     <form id="quiz-setup" class="card">
       <h3>題型</h3>
       <div class="chips">${Object.entries(Quiz.TYPES).map(([k, t]) => chip('types', k, t.label, types.includes(k))).join('')}</div>
-      <h3>單字等級（只影響單字題）</h3>
-      <div class="chips">${Quiz.LEVELS.map(l => { const s = Quiz.levelStats(l); return chip('levels', l, `${l} <small>${s.mastered}/${s.total}</small>`, levels.includes(l)); }).join('')}</div>
-      <p class="meta">不勾等級 = 全部單字</p>
+      <h3>等級（單字題看單字等級，漢字題看漢字等級）</h3>
+      <div class="chips">${Quiz.LEVELS.map(l => {
+        const s = Quiz.levelStats(l);
+        // 只有漢字、沒有單字的等級（例如「其他」）改顯示漢字數，免得看起來像 0 題
+        const label = s.total ? `${l} <small>${s.mastered}/${s.total}</small>` : `${l} <small>漢字 ${Quiz.kanjiStats(l).total}</small>`;
+        return chip('levels', l, label, levels.includes(l));
+      }).join('')}</div>
+      <p class="meta">不勾等級 = 全部等級</p>
       <h3>單字來源</h3>
       <div class="chips">${chip('origins', 'notion', `📓 我的筆記 <small>${o.notionVocab}</small>`, origins.includes('notion'))}${chip('origins', 'external', `🌐 公開單字 <small>${o.externalVocab}</small>`, origins.includes('external'))}</div>
       <p class="meta">不勾來源 = 兩種都出。公開單字的中文是 AI 翻譯。</p>
@@ -217,9 +224,9 @@
       <div class="quiz-top"><span class="tag">${esc(q.typeLabel)}</span><span class="meta">${quiz.i + 1} / ${quiz.qs.length}</span><span class="score">⭐ ${quiz.score}</span></div>
       <div class="bar"><div class="fill" style="width:${quiz.i / quiz.qs.length * 100}%"></div></div>
       <div class="card question tape">
-        <div class="prompt">${esc(q.prompt)}</div>
+        <div class="prompt ${[...q.prompt].length === 1 ? 'single' : ''}">${q.promptHtml || esc(q.prompt)}</div>
         ${q.sub ? `<div class="sub">${esc(q.sub)}</div>` : ''}
-        ${q.type !== 'kana' && /[぀-ヿ一-鿿]/.test(q.prompt) ? `<button class="btn tiny say" data-say="${esc(q.item.reading || q.prompt)}">🔊</button>` : `<button class="btn tiny say" data-say="${esc(q.prompt)}">🔊</button>`}
+        ${q.type.startsWith('kanji') ? '' : q.type !== 'kana' &&/[぀-ヿ一-鿿]/.test(q.prompt) ? `<button class="btn tiny say" data-say="${esc(q.item.reading || q.prompt)}">🔊</button>` : `<button class="btn tiny say" data-say="${esc(q.prompt)}">🔊</button>`}
       </div>
       <div class="choices">${q.choices.map((c, i) => `<button class="btn choice" data-i="${i}"><span class="key">${'ABCD'[i]}</span>${esc(c)}</button>`).join('')}</div>
       <div id="feedback" class="feedback"></div>
@@ -241,7 +248,8 @@
     const it = q.item;
     const extra = [it.reading && it.reading !== q.prompt ? `讀音：${esc(it.reading)}` : '',
       it.meaningEn && it.meaningEn !== it.meaning ? `英文：${esc(it.meaningEn)}${it.ai ? ' <span class="tag">AI 翻譯</span>' : ''}` : '',
-      it.example ? `例句：${esc(it.example)}` : '', it.usage ? `用法：${esc(it.usage)}` : '', it.source ? `<span class="meta">出處：${esc(it.source)}</span>` : ''].filter(Boolean).join('<br>');
+      it.example ? `例句：${esc(it.example)}` : '', it.usage ? `用法：${esc(it.usage)}` : '', q.detail ? esc(q.detail) + (q.type === 'kanji_word' ? ` <button class="btn tiny" data-say="${esc(it.reading)}">🔊</button>` : '') : '',
+      it.source ? `<span class="meta">出處：${esc(it.source)}</span>` : ''].filter(Boolean).join('<br>');
     $('#feedback').innerHTML = `<div class="card ${ok ? 'good' : 'bad'}">${ok ? window.DOODLES.checkmark + '<b>正解！すごい！</b>' : window.DOODLES.cross + `<b>答案是：${esc(q.answer)}</b>`}<div class="extra">${extra}</div>
       <button class="btn primary" id="next">${quiz.i + 1 < quiz.qs.length ? '下一題 →' : '看結果 🎉'}</button></div>`;
     $('#next').focus();
@@ -276,6 +284,62 @@
       quiz.qs = qs; quiz.i = 0; quiz.score = 0; quiz.answered = false; quiz.wrong = []; quiz.mode = '錯題重練';
       renderQuestion(); void ids;
     });
+  }
+
+  // ────────────────────────────── 漢字 ──────────────────────────────
+  const KLEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
+  function kanjiDetailHtml(k) {
+    const A = window.KanjiAlign;
+    const uses = DATA().kanjiUses?.get(k.k) || [];
+    const special = DATA().kanjiSpecial?.get(k.k) || [];
+    const segs = [...new Set(uses.map(u => u.seg))];
+    return `
+      <div class="kd-head">
+        <div class="kd-char">${esc(k.k)}</div>
+        <div>
+          <p class="meta">${k.level}・${k.strokes ?? '?'} 畫${k.grade && k.grade <= 6 ? `・日本小學 ${k.grade} 年級` : ''}</p>
+          ${k.trad.length ? `<p>繁體寫法：<b class="hl">${esc(k.trad.join('／'))}</b></p>` : '<p class="meta">和繁體寫法相同</p>'}
+          <p class="meta">${esc(k.meanings.join(', '))}</p>
+        </div>
+        <button class="btn tiny" data-say="${esc(k.k)}">🔊</button>
+      </div>
+      <p><span class="tag">音讀</span> ${k.on.length ? esc(k.on.map(A.toKata).join('・')) : '—'}</p>
+      <p><span class="tag">訓讀</span> ${(k.kunTop || k.kun).length ? (k.kunTop || k.kun).map(A.kunHtml).join('・') : '—'}</p>
+      ${uses.length ? `<h3>在你的單字裡 <small>${uses.length} 個詞</small></h3>
+        <p class="meta">這個字出現過的唸法：${esc(segs.join('、'))}</p>
+        <ul class="kd-words">${uses.slice(0, 12).map(u => `<li><span class="kd-w">${A.highlightHtml(u)}</span> <span class="meta">${A.readingHtml(u)}</span> ${esc(u.meaning)}</li>`).join('')}</ul>` : '<p class="meta">你目前的單字裡還沒有用到這個字。</p>'}
+      ${special.length ? `<h3>特殊讀法 <small>不拆字唸</small></h3>
+        <ul class="kd-words">${special.slice(0, 8).map(v => `<li><span class="kd-w">${esc(v.word)}</span> <span class="meta">${esc(v.reading)}</span> ${esc(v.meaning)}</li>`).join('')}</ul>` : ''}`;
+  }
+  function viewKanji(level, sel) {
+    const K = DATA().kanji || [];
+    if (!K.length) return `<div class="card"><h2>還沒有漢字資料</h2><p>請先執行 <code>npm run build:kanji</code> 產生 <code>data/kanji.js</code>。</p></div>`;
+    const levels = K.some(k => k.level === '其他') ? [...KLEVELS, '其他'] : KLEVELS;
+    if (!levels.includes(level)) level = 'N5';
+    const list = K.filter(k => k.level === level);
+    const st = Quiz.kanjiStats(level);
+    const cur = sel ? K.find(k => k.k === sel) : null;
+    const words = (DATA().kanjiWords || []).filter(w => w.level === level).length;
+    const cell = k => `<a class="kj ${Quiz.kanjiStatus(k)} ${cur === k ? 'on' : ''}" href="#/kanji/${level}/${encodeURIComponent(k.k)}" title="${esc(k.meanings.join(', '))}"><span class="big">${esc(k.k)}</span>${k.trad.length ? `<span class="trad">${esc(k.trad[0])}</span>` : ''}</a>`;
+    return `
+    <section class="page-head"><h1>🀄 漢字</h1>
+      <p class="lead">字義你一看就懂，難的是讀音。這裡練音讀、訓讀，還有同一個字放進不同詞裡怎麼唸。</p>
+      <div class="actions">${levels.map(l => `<a class="btn small ${l === level ? 'primary' : ''}" href="#/kanji/${l}">${l} <small>${K.filter(k => k.level === l).length}</small></a>`).join('')}</div>
+    </section>
+    <div class="grid2">
+      <div class="card">
+        <h2>${level} 漢字 <small>${list.length} 字</small></h2>
+        ${level === '其他' ? '<p class="meta">tanos 的 JLPT 漢字表沒有收錄、但出現在你單字裡的日本常用漢字，例如「分」。不確定屬於哪一級，所以單獨放在這裡。</p>' : ''}
+        <div class="bar"><div class="fill" style="width:${st.pct}%"></div></div>
+        <p class="meta">熟練 ${st.mastered} / ${st.total}：音讀、訓讀題都連對 3 次才算。字格右下的紅色小字是繁體寫法，只有和日本寫法不同才會出現。</p>
+        <div class="actions">
+          <a class="btn small primary" href="#/quiz?types=kanji_on,kanji_kun&levels=${level}">✏️ 字的讀音</a>
+          ${words ? `<a class="btn small" href="#/quiz?types=kanji_word&levels=${level}">✏️ 詞裡的讀音 <small>${words}</small></a>` : '<span class="meta">這一級的字還沒出現在你的單字裡，暫時沒有「詞裡的讀音」題。</span>'}
+        </div>
+      </div>
+      <div class="card kanji-detail">${cur ? kanjiDetailHtml(cur) : '<p class="meta">👇 點下面任一個字，看讀音和用到它的單字。</p>'}</div>
+    </div>
+    <section class="card"><div class="kj-grid">${list.map(cell).join('')}</div></section>`;
   }
 
   // ────────────────────────────── 跨裝置同步 ──────────────────────────────
@@ -350,6 +414,8 @@
       case 'notes': app().innerHTML = viewNotes(seg[1], params.get('q') || ''); break;
       case 'kana': app().innerHTML = viewKana(seg[1] || 'hira'); break;
       case 'sync': app().innerHTML = viewSync(); break;
+      // 等級也要解碼：「其他」在網址裡會變成 %E5%85%B6%E4%BB%96
+      case 'kanji': app().innerHTML = viewKanji(decodeURIComponent(seg[1] || ''), decodeURIComponent(seg[2] || '')); break;
       case 'quiz':
         if (params.get('mode') === 'daily') { startQuiz({ types: ['vocab_meaning', 'vocab_reading', 'grammar', 'phrase'], count: 10 }, '今日複習'); break; }
         app().innerHTML = viewQuizSetup(params); break;

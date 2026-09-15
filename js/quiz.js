@@ -28,8 +28,50 @@ window.Quiz = (() => {
     grammar:       { label: '句型 → 意思', pool: 'grammar', prompt: g => g.pattern, sub: () => '', answer: g => g.meaning, kind: 'meaning' },
     phrase:        { label: '會話 → 中文', pool: 'phrases', prompt: p => p.jp, sub: p => p.romaji || '', answer: p => p.zh, kind: 'meaning' },
     kana:          { label: '假名 → 羅馬拼音', pool: 'kana', prompt: k => k.hira, sub: k => k.kata, answer: k => k.romaji, kind: 'romaji' },
+    // 漢字：id 加上 :on / :kun，讓同一個字的音讀和訓讀分開記進度
+    kanji_on:      { label: '漢字 → 音讀', pool: 'kanji', filter: k => k.on.length > 0, id: k => k.id + ':on',
+                     prompt: k => k.k, sub: k => [tradNote(k), '音讀是？'].filter(Boolean).join('　'), answer: k => onText(k), kind: 'reading',
+                     distractors: k => similarKanji(k, 'on'), conflict: (a, b) => overlap(a.on, b.on), detail: k => kanjiDetail(k) },
+    kanji_kun:     { label: '漢字 → 訓讀', pool: 'kanji', filter: k => k.kun.length > 0, id: k => k.id + ':kun',
+                     prompt: k => k.k, sub: k => [tradNote(k), '訓讀是？'].filter(Boolean).join('　'), answer: k => kunText(k), kind: 'reading',
+                     distractors: k => similarKanji(k, 'kun'), conflict: (a, b) => overlap(kunStems(a), kunStems(b)), detail: k => kanjiDetail(k) },
+    kanji_word:    { label: '詞裡的讀音', pool: 'kanjiWords', prompt: w => w.word, promptHtml: w => KA().highlightHtml(w),
+                     sub: w => `「${w.ch}」在這個詞裡怎麼唸？`, answer: w => w.seg, kind: 'reading',
+                     distractors: w => otherReadings(w), conflict: (a, b) => a.ch === b.ch, detail: w => `${w.word}＝${w.meaning}` },
   };
-  const LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', '筆記'];
+  // 筆記＝Notion 裡沒標等級的單字；其他＝不在 JLPT 漢字表、但出現在你單字裡的常用漢字
+  const LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', '筆記', '其他'];
+  const LEVELED = new Set(['vocab', 'kanji', 'kanjiWords']);
+
+  // ── 漢字題用的小工具（KanjiAlign 由 js/kanji-align.js 提供）──
+  const KA = () => window.KanjiAlign;
+  const overlap = (a, b) => a.some(x => b.includes(x));
+  const kunStems = k => (k.kun || []).map(x => x[0]);
+  const kunWord = ([s, o]) => (o ? `${s}(${o})` : s);
+  const onText = k => (k.on || []).map(r => KA().toKata(r)).join('・');
+  function kunText(k) {
+    const seen = new Set(), out = [];
+    for (const x of k.kunTop || k.kun || []) { const w = kunWord(x); if (!seen.has(w)) { seen.add(w); out.push(w); } if (out.length === 3) break; }
+    return out.join('・');
+  }
+  const tradNote = k => (k.trad?.length ? `繁體：${k.trad.join('／')}` : '');
+  const kanjiDetail = k => [`音讀：${onText(k) || '—'}`, `訓讀：${(k.kunTop || k.kun || []).map(kunWord).join('・') || '—'}`, tradNote(k), k.meanings?.length ? `英：${k.meanings.join(', ')}` : ''].filter(Boolean).join('　');
+  // 同級、讀音開頭相近但完全不重疊的字，當干擾選項比較有鑑別度
+  function similarKanji(k, kind) {
+    const mine = kind === 'on' ? k.on : kunStems(k);
+    const firsts = new Set(mine.map(r => r[0]));
+    return (D().kanji || [])
+      .filter(x => x !== k && x.level === k.level)
+      .filter(x => { const theirs = kind === 'on' ? x.on : kunStems(x); return theirs.length && !overlap(mine, theirs) && theirs.some(r => firsts.has(r[0])); })
+      .slice(0, 40).map(kind === 'on' ? onText : kunText);
+  }
+  // 同一個字的其他唸法（包含在別的詞裡出現過的音變），是「詞裡的讀音」最好的干擾選項
+  function otherReadings(w) {
+    const e = (D().kanji || []).find(x => x.k === w.ch);
+    const seen = (D().kanjiUses?.get(w.ch) || []).map(u => u.seg);
+    const base = e ? [...e.on, ...kunStems(e)].map(r => KA().toHira(r)) : [];
+    return [...new Set([...seen, ...base])].filter(r => r !== w.seg);
+  }
 
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
@@ -38,23 +80,23 @@ window.Quiz = (() => {
     const t = TYPES[typeKey];
     let items = D()[t.pool] || [];
     if (t.filter) items = items.filter(t.filter);
-    if (t.pool === 'vocab' && levels?.length) items = items.filter(v => levels.includes(v.level));
-    if (t.pool === 'vocab' && origins?.length) items = items.filter(v => origins.includes(v.origin || 'notion'));
+    if (LEVELED.has(t.pool) && levels?.length) items = items.filter(v => levels.includes(v.level));
+    if ((t.pool === 'vocab' || t.pool === 'kanjiWords') && origins?.length) items = items.filter(v => origins.includes(v.origin || 'notion'));
     return items;
   }
 
+  // 干擾選項：先用題型指定的（例如同一個字的其他唸法），不夠再從同級、其他級補
+  // conflict(a, b) 為真代表 b 的答案對 a 來說其實也算對，不能拿來當干擾
   function pickDistractors(item, all, t, n = 3) {
     const ans = t.answer(item);
-    const same = all.filter(x => x !== item && t.answer(x) !== ans && (!item.level || x.level === item.level));
-    const other = all.filter(x => x !== item && t.answer(x) !== ans && !same.includes(x));
-    const out = [];
-    const seen = new Set([ans]);
-    for (const x of shuffle(same).concat(shuffle(other))) {
-      const a = t.answer(x);
-      if (seen.has(a)) continue;
-      seen.add(a); out.push(a);
-      if (out.length === n) break;
-    }
+    const out = [], seen = new Set([ans]);
+    const take = a => { if (a && !seen.has(a)) { seen.add(a); out.push(a); } return out.length >= n; };
+    for (const a of shuffle([...(t.distractors?.(item) || [])])) if (take(a)) return out;
+    const ok = x => x !== item && !(t.conflict && t.conflict(item, x));
+    const same = all.filter(x => ok(x) && (!item.level || x.level === item.level));
+    const sameSet = new Set(same);
+    const other = all.filter(x => ok(x) && !sameSet.has(x));
+    for (const x of shuffle(same).concat(shuffle(other))) if (take(t.answer(x))) return out;
     return out;
   }
 
@@ -66,23 +108,24 @@ window.Quiz = (() => {
     const candidates = [];
     for (const tk of types) {
       const t = TYPES[tk];
+      const qid = it => (t.id ? t.id(it) : it.id);
       let items = poolFor(tk, opts.levels, opts.origins);
-      if (opts.weakOnly) items = items.filter(x => isWeak(Progress.stat(x.id)));
-      for (const it of items) candidates.push({ tk, it });
+      if (opts.weakOnly) items = items.filter(x => isWeak(Progress.stat(qid(x))));
+      for (const it of items) candidates.push({ tk, it, qid: qid(it) });
     }
     if (!candidates.length) return [];
 
     // 優先出：沒看過的 → 弱點 → 其他（每組內隨機）
-    const bucket = c => { const s = Progress.stat(c.it.id); return s.seen === 0 ? 0 : isWeak(s) ? 1 : isMastered(s) ? 3 : 2; };
+    const bucket = c => { const s = Progress.stat(c.qid); return s.seen === 0 ? 0 : isWeak(s) ? 1 : isMastered(s) ? 3 : 2; };
     const grouped = [[], [], [], []];
     for (const c of shuffle(candidates)) grouped[bucket(c)].push(c);
     const chosen = grouped.flat().slice(0, count);
 
-    return shuffle(chosen).map(({ tk, it }) => {
+    return shuffle(chosen).map(({ tk, it, qid }) => {
       const t = TYPES[tk];
       const answer = t.answer(it);
       const choices = shuffle([answer, ...pickDistractors(it, poolFor(tk, opts.levels, opts.origins), t)]);
-      return { id: it.id, type: tk, typeLabel: t.label, prompt: t.prompt(it), sub: t.sub(it), answer, choices, item: it };
+      return { id: qid, type: tk, typeLabel: t.label, prompt: t.prompt(it), promptHtml: t.promptHtml?.(it), sub: t.sub(it), answer, choices, item: it, detail: t.detail?.(it) };
     });
   }
 
@@ -104,5 +147,19 @@ window.Quiz = (() => {
     return { total: all.length, vocab: D().vocab.length, notionVocab: D().vocab.length - externalVocab, externalVocab, mastered, weak };
   }
 
-  return { TYPES, LEVELS, isMastered, isWeak, buildQuestions, levelStats, overallStats };
+  // 漢字的狀態：音讀、訓讀題都熟練才算熟練；任一題是弱點就標弱點
+  function kanjiStatus(k) {
+    const ids = [k.on?.length && k.id + ':on', k.kun?.length && k.id + ':kun'].filter(Boolean);
+    const ss = ids.map(id => Progress.stat(id));
+    if (!ss.some(s => s.seen)) return '';
+    if (ss.some(isWeak)) return 'weak';
+    return ss.every(isMastered) ? 'mastered' : 'seen';
+  }
+  function kanjiStats(level) {
+    const ks = (D().kanji || []).filter(k => k.level === level);
+    const mastered = ks.filter(k => kanjiStatus(k) === 'mastered').length;
+    return { total: ks.length, mastered, pct: ks.length ? Math.round(mastered / ks.length * 100) : 0 };
+  }
+
+  return { TYPES, LEVELS, isMastered, isWeak, buildQuestions, levelStats, overallStats, kanjiStatus, kanjiStats, onText, kunText };
 })();

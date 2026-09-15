@@ -215,6 +215,30 @@ article ul { padding-left: 1.3rem; }
 .feedback .extra { grid-column: 2; font-size: .93rem; }
 @keyframes pop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (max-width: 560px) { .feedback .card { grid-template-columns: 48px 1fr; } .feedback .btn { grid-column: 1 / -1; justify-content: center; } }
+.question .prompt.single { font-size: 5rem; }
+.kw-target { color: var(--red); background: linear-gradient(transparent 60%, var(--yellow) 60%); font-weight: 600; }
+.bar.thin { height: 8px; margin-top: .2rem; }
+
+/* ───────────────────────────── 漢字 ───────────────────────────── */
+.kj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: .45rem; }
+.kj { position: relative; display: flex; align-items: center; justify-content: center; height: 58px; text-decoration: none;
+  background: #fff; border: 2px solid var(--ink); border-radius: var(--wobble); box-shadow: 2px 2px 0 var(--ink); font-family: var(--font-hand); }
+.kj:nth-child(even) { border-radius: var(--wobble-2); }
+.kj .big { font-size: 1.75rem; line-height: 1; }
+.kj .trad { position: absolute; right: 4px; bottom: 1px; font-size: .72rem; color: var(--red); font-family: var(--font-body); }
+.kj:hover { background: var(--pink); transform: translate(-1px, -1px); }
+.kj.seen { background: #fffbe7; } .kj.weak { background: #ffe3e3; } .kj.mastered { background: #e3f5df; }
+.kj.on { outline: 3px solid var(--red); outline-offset: 2px; }
+.kanji-detail { min-height: 12rem; }
+.kd-head { display: flex; gap: 1rem; align-items: flex-start; }
+.kd-head p { margin: .1rem 0 .3rem; }
+.kd-char { font-family: var(--font-hand); font-size: 4.2rem; line-height: 1; padding: .12em .22em; background: var(--paper-2);
+  border: 2.5px solid var(--ink); border-radius: var(--wobble); box-shadow: 2px 2px 0 var(--ink); }
+.okuri { color: var(--ink-soft); }
+.kd-words { list-style: none; padding: 0; margin: .3rem 0; }
+.kd-words li { padding: .25rem 0; border-bottom: 1.5px dashed var(--line); }
+.kd-w { font-family: var(--font-hand); font-size: 1.2rem; margin-right: .3rem; }
+
 .result h1 { font-size: 3.5rem; }
 .result-mascot .doodle { width: 130px; height: 130px; }
 .wrong-list li { padding: .3rem 0; border-bottom: 1.5px dashed var(--line); } .wrong-list .meta { margin: 0 .4em; }
