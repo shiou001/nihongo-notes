@@ -4,16 +4,10 @@
 window.Quiz = (() => {
   const D = () => window.NIHONGO_DATA || { vocab: [], grammar: [], phrases: [], kana: [] };
 
-  // ─────────────────────────────────────────────────────────────
-  // 🖊️ 熟練度判定 — 這裡決定「一個單字什麼時候算背起來了」。
-  //   預設：連續答對 3 次就算熟練；答錯一次 streak 歸零。
-  //   你可以改成例如「正確率 ≥ 80% 且看過 ≥ 4 次」：
-  //     return s.seen >= 4 && s.correct / s.seen >= 0.8;
-  //   或加入時間衰減（超過 14 天沒複習就不算熟練）：
-  //     return s.streak >= 3 && Date.now() - s.last < 14 * 864e5;
-  // ─────────────────────────────────────────────────────────────
+  // Mastery requires independently correct answers on three spaced, due reviews.
+  // Legacy streaks are retained as history, never treated as spaced evidence.
   function isMastered(s) {
-    return s.streak >= 3;
+    return s.scheduleVersion === 2 && s.retained >= 3;
   }
 
   // 「弱點」：答錯比答對多，或最近一次答錯
@@ -23,9 +17,11 @@ window.Quiz = (() => {
 
   const TYPES = {
     vocab_meaning: { label: '單字 → 意思', pool: 'vocab', prompt: v => v.word, sub: v => v.reading !== v.word ? v.reading : '', answer: v => v.meaning, kind: 'meaning' },
-    vocab_reading: { label: '讀音 → 單字', pool: 'vocab', prompt: v => v.reading, sub: v => v.meaning, answer: v => v.word, kind: 'word', filter: v => v.reading && v.reading !== v.word },
+    vocab_reading: { label: '讀音 → 單字', pool: 'vocab', prompt: v => v.reading, sub: () => '', hint: v => v.meaning, answer: v => v.word, kind: 'word', filter: v => v.reading && v.reading !== v.word },
+    vocab_recall: { label: '輸入假名讀音', pool: 'vocab', prompt: v => v.word, sub: () => '', hint: v => v.meaning, answer: v => v.reading, kind: 'reading', input: true, filter: v => /^[\u3041-\u3096ー]+$/.test(v.reading) && v.reading !== v.word },
     vocab_word:    { label: '意思 → 單字', pool: 'vocab', prompt: v => v.meaning, sub: () => '', answer: v => v.word, kind: 'word' },
-    grammar:       { label: '句型 → 意思', pool: 'grammar', prompt: g => g.pattern, sub: () => '', answer: g => g.meaning, kind: 'meaning' },
+    grammar:       { label: '文法／疑問詞 → 意思', pool: 'grammar', prompt: g => g.pattern, sub: () => '', answer: g => g.meaning, kind: 'meaning' },
+    grammar_cloze: { label: '例句填空', pool: 'grammar', input: true, filter: g => g.example && g.example.includes(g.pattern) && !/[〜～（(]/.test(g.pattern) && !g.example.startsWith('原形：'), prompt: g => g.example.split(g.pattern).join('＿＿'), sub: () => '', hint: g => g.meaning, answer: g => g.pattern, kind: 'word' },
     phrase:        { label: '會話 → 中文', pool: 'phrases', prompt: p => p.jp, sub: p => p.romaji || '', answer: p => p.zh, kind: 'meaning' },
     kana:          { label: '假名 → 羅馬拼音', pool: 'kana', prompt: k => k.hira, sub: k => k.kata, answer: k => k.romaji, kind: 'romaji' },
     // 漢字：id 加上 :on / :kun，讓同一個字的音讀和訓讀分開記進度
@@ -92,11 +88,20 @@ window.Quiz = (() => {
     const out = [], seen = new Set([ans]);
     const take = a => { if (a && !seen.has(a)) { seen.add(a); out.push(a); } return out.length >= n; };
     for (const a of shuffle([...(t.distractors?.(item) || [])])) if (take(a)) return out;
-    const ok = x => x !== item && !(t.conflict && t.conflict(item, x));
+    // Exclude alternate spellings/readings or overlapping glosses that can also be right.
+    const clean = s => String(s || '').replace(/\*\*/g, '').trim();
+    const glosses = x => clean(x.meaning || x.zh).split(/[、，,；;]/).filter(Boolean);
+    const ok = x => x !== item && !(t.conflict && t.conflict(item, x)) && !(item.pattern && x.pattern === item.pattern) &&
+      !(item.word && (clean(x.word) === clean(item.word) || (item.reading && clean(x.reading) === clean(item.reading)))) &&
+      !glosses(item).some(a => glosses(x).includes(a));
     const same = all.filter(x => ok(x) && (!item.level || x.level === item.level));
     const sameSet = new Set(same);
     const other = all.filter(x => ok(x) && !sameSet.has(x));
-    for (const x of shuffle(same).concat(shuffle(other))) if (take(t.answer(x))) return out;
+    const related = shuffle(same).sort((a, b) => {
+      const rank = x => (item.pos && x.pos === item.pos ? 4 : 0) + (item.category && x.category === item.category ? 3 : 0) + (item.reading && x.reading?.[0] === item.reading[0] ? 1 : 0);
+      return rank(b) - rank(a);
+    });
+    for (const x of related.concat(shuffle(other))) if (take(t.answer(x))) return out;
     return out;
   }
 
@@ -110,24 +115,47 @@ window.Quiz = (() => {
       const t = TYPES[tk];
       const qid = it => (t.id ? t.id(it) : it.id);
       let items = poolFor(tk, opts.levels, opts.origins);
+      if (opts.source) items = items.filter(x => x.source === opts.source);
+      if (opts.page) items = items.filter(x => x.source?.startsWith(opts.page + ' › '));
       if (opts.weakOnly) items = items.filter(x => isWeak(Progress.stat(qid(x))));
       for (const it of items) candidates.push({ tk, it, qid: qid(it) });
     }
     if (!candidates.length) return [];
 
-    // 優先出：沒看過的 → 弱點 → 其他（每組內隨機）
-    const bucket = c => { const s = Progress.stat(c.qid); return s.seen === 0 ? 0 : isWeak(s) ? 1 : isMastered(s) ? 3 : 2; };
+    const now = opts.now ?? Date.now();
+    // Due reviews (including pre-scheduler records) precede unseen content.
+    const bucket = c => { const s = Progress.stat(c.qid); return s.seen && (!s.due || s.due <= now) ? 0 : s.seen === 0 ? 1 : isWeak(s) ? 2 : 3; };
     const grouped = [[], [], [], []];
     for (const c of shuffle(candidates)) grouped[bucket(c)].push(c);
-    const chosen = grouped.flat().slice(0, count);
+    const chosen = [], used = new Set();
+    const introducedToday = (D().vocab || []).filter(v => {
+      const s = Progress.stat(v.id); return opts.levels?.includes(v.level) && s.firstSeen && Progress.dayKey(new Date(s.firstSeen)) === Progress.dayKey(new Date(now));
+    }).length;
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 6) % 7);
+    weekStart.setHours(0, 0, 0, 0);
+    const introducedThisWeek = (D().vocab || []).filter(v => opts.levels?.includes(v.level) && Progress.stat(v.id).firstSeen >= +weekStart && Progress.stat(v.id).firstSeen <= now).length;
+    let newRemaining = Math.max(0, Math.min((opts.newLimit ?? 5) - introducedToday, (opts.weeklyLimit ?? Infinity) - introducedThisWeek));
+    for (const c of grouped.flat()) {
+      if (used.has(c.qid)) continue;
+      const s = Progress.stat(c.qid);
+      if (opts.daily && s.seen && s.due > now) continue;
+      if (opts.daily && !s.seen && newRemaining <= 0) continue;
+      if (!s.seen) newRemaining--;
+      chosen.push(c); used.add(c.qid);
+      if (chosen.length >= count) break;
+    }
 
-    return shuffle(chosen).map(({ tk, it, qid }) => {
+    return chosen.map(({ tk, it, qid }) => {
       const t = TYPES[tk];
       const answer = t.answer(it);
-      const choices = shuffle([answer, ...pickDistractors(it, poolFor(tk, opts.levels, opts.origins), t)]);
-      return { id: qid, type: tk, typeLabel: t.label, prompt: t.prompt(it), promptHtml: t.promptHtml?.(it), sub: t.sub(it), answer, choices, item: it, detail: t.detail?.(it) };
+      const choices = t.input ? [] : shuffle([answer, ...pickDistractors(it, poolFor(tk, opts.levels, opts.origins), t)]);
+      return { id: qid, type: tk, typeLabel: tk === 'grammar' ? `${it.category || '文法'} → 意思` : t.label, prompt: t.prompt(it), promptHtml: t.promptHtml?.(it), sub: t.sub(it), hint: t.hint?.(it), input: !!t.input || choices.length < 2, answer, choices, item: it, detail: t.detail?.(it), learnFirst: !!opts.daily && !Progress.stat(qid).seen };
     });
   }
+
+  const normalizeAnswer = text => String(text ?? '').normalize('NFKC').replace(/\*\*/g, '').trim().replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+  const checkAnswer = (q, value) => normalizeAnswer(q.answer) === normalizeAnswer(value);
 
   // 統計：某等級的熟練狀況
   function levelStats(level) {
@@ -161,5 +189,5 @@ window.Quiz = (() => {
     return { total: ks.length, mastered, pct: ks.length ? Math.round(mastered / ks.length * 100) : 0 };
   }
 
-  return { TYPES, LEVELS, isMastered, isWeak, buildQuestions, levelStats, overallStats, kanjiStatus, kanjiStats, onText, kunText };
+  return { TYPES, LEVELS, isMastered, isWeak, buildQuestions, levelStats, overallStats, kanjiStatus, kanjiStats, onText, kunText, checkAnswer, normalizeAnswer };
 })();

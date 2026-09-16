@@ -1,7 +1,7 @@
 // 由 sync/ 腳本自動產生，請勿手動編輯。
-// 同步時間：2026-09-15T21:52:19.024Z
+// 同步時間：2026-09-16T04:14:22.947Z
 window.NIHONGO_DATA = {
- "syncedAt": "2026-09-15T21:52:19.024Z",
+ "syncedAt": "2026-09-16T04:14:22.947Z",
  "pages": [
   {
    "id": "376d7785-7287-8151-bb9d-dd3dd0c6473e",
@@ -427,7 +427,7 @@ window.NIHONGO_DATA = {
      "blocks": [
       {
        "type": "quote",
-       "text": "清音加上「゛」濁點，變成有聲音。"
+       "text": "か、さ、た、は行加上「゛」形成濁音；並非所有清音都能加濁點，也不是所有清音都沒有聲帶振動。"
       }
      ]
     },
@@ -652,7 +652,7 @@ window.NIHONGO_DATA = {
      "blocks": [
       {
        "type": "quote",
-       "text": "子音 + 小寫的ゃ、ゅ、ょ，組合成新的音。"
+       "text": "き、し、ち、に、ひ、み、り及相應濁音／半濁音假名，加小寫ゃ、ゅ、ょ，合成一拍；例如 きゃ 一拍，きや 兩拍。"
       }
      ]
     },
@@ -1050,7 +1050,7 @@ window.NIHONGO_DATA = {
      "blocks": [
       {
        "type": "para",
-       "text": "「ん」是唯一沒有母音的子音，獲得一拍的時間。"
+       "text": "撥音「ん」本身占一拍，發音會受後面的音影響。練習時保留這一拍，不要額外加上母音。"
       },
       {
        "type": "table",
@@ -1731,8 +1731,8 @@ window.NIHONGO_DATA = {
        "rows": [
         [
          "を",
-         "wo",
-         "只作受詞助詞（公式）",
+         "o（輸入法打 wo）",
+         "標記動作對象，也可標記移動的起點或路徑",
          "りんごを食べる"
         ],
         [
@@ -1745,9 +1745,58 @@ window.NIHONGO_DATA = {
       },
       {
        "type": "quote",
-       "text": "💡 看到「を」→ 前面一定是受詞，後面一定是動詞。"
+       "text": "💡 を 常標記動作對象，例如「りんごを食べる」。也能標記路徑「橋を渡る」或起點「家を出る」；不能一律當成受詞，動詞也不必緊接在 を 後面。"
+      },
+      {
+       "type": "para",
+       "text": "現代標準語的助詞 を 通常讀 /o/，與 お 同音。wo 可用於鍵盤輸入或區分字形的轉寫，不代表標準發音。參考：[東京外國語大學・格助詞](https://www.coelang.tufs.ac.jp/mt/ja/gmod/courses/c02/lesson27/step2/explanation/053.html)、[を 的辭典說明](https://dictionary.goo.ne.jp/word/%E3%82%92/)。"
+      },
+      {
+       "type": "table",
+       "headers": [
+        "例句",
+        "中文",
+        "用法"
+       ],
+       "rows": [
+        [
+         "りんごを食べます。",
+         "吃蘋果。",
+         "動作對象"
+        ],
+        [
+         "橋を渡ります。",
+         "過橋。",
+         "移動路徑"
+        ],
+        [
+         "家を出ます。",
+         "離開家。",
+         "離開起點"
+        ]
+       ]
+      },
+      {
+       "type": "quote",
+       "text": "常見誤判：不能因為「橋を渡る」有 を，就把 渡る 判為他動詞。先判斷整句表達的是動作對象、路徑還是起點。"
+      },
+      {
+       "type": "table",
+       "headers": [
+        "助詞",
+        "用途",
+        "例句"
+       ],
+       "rows": [
+        [
+         "を",
+         "標記動作對象、移動起點或路徑",
+         "橋を渡ります。"
+        ]
+       ]
       }
-     ]
+     ],
+     "editorial": "2026-09-16：補充 を 的適用範圍、發音與反例。"
     },
     {
      "heading": "其他常用助詞",
@@ -1763,7 +1812,7 @@ window.NIHONGO_DATA = {
        "rows": [
         [
          "は",
-         "主题標記",
+         "主題標記",
          "私**は**学生です"
         ],
         [
@@ -2128,12 +2177,12 @@ window.NIHONGO_DATA = {
         [
          "否定（正式）",
          "ではありません",
-         "學生ではありません。"
+         "学生ではありません。"
         ],
         [
          "否定（口語）",
          "じゃないです",
-         "學生じゃないです。"
+         "学生じゃないです。"
         ]
        ]
       }
@@ -5332,83 +5381,103 @@ window.NIHONGO_DATA = {
    "id": "g_gtffe8",
    "pattern": "〜ながら",
    "meaning": "一邊…一邊…",
-   "example": "景色を見**ながら**思う",
+   "category": "句型",
+   "example": "景色を見ながら思う",
    "source": "閱讀練習 › 📜 綺麗な心（きれいなこころ） › 💡 重要句型"
   },
   {
    "id": "g_14druet",
    "pattern": "〜ばかりではない",
    "meaning": "並非全是…",
-   "example": "美しいこと**ばかりではない**",
+   "category": "句型",
+   "example": "美しいことばかりではない",
    "source": "閱讀練習 › 📜 綺麗な心（きれいなこころ） › 💡 重要句型"
   },
   {
    "id": "g_11fql2o",
    "pattern": "〜からだ",
    "meaning": "是因為…",
-   "example": "心が美しい**からだ**",
+   "category": "句型",
+   "example": "心が美しいからだ",
    "source": "閱讀練習 › 📜 綺麗な心（きれいなこころ） › 💡 重要句型"
   },
   {
    "id": "g_17qj96l",
    "pattern": "〜てみよう",
    "meaning": "試著…",
-   "example": "思っ**てみよう**",
+   "category": "句型",
+   "example": "思ってみよう",
    "source": "閱讀練習 › 📜 綺麗な心（きれいなこころ） › 💡 重要句型"
   },
   {
    "id": "g_qrwodf",
    "pattern": "もし〜なら",
    "meaning": "如果…",
-   "example": "**もし**汚ないと思える**なら**",
+   "category": "句型",
+   "example": "もし汚ないと思えるなら",
    "source": "閱讀練習 › 📜 綺麗な心（きれいなこころ） › 💡 重要句型"
   },
   {
-   "id": "g_tzemwc",
+   "id": "g_1thofk1",
+   "pattern": "を",
+   "meaning": "標記動作對象、移動起點或路徑",
+   "category": "助詞",
+   "example": "橋を渡ります。",
+   "source": "文法筆記 › 助詞 を vs お"
+  },
+  {
+   "id": "g_1cn6cw0",
    "pattern": "は",
-   "meaning": "主题標記",
-   "example": "私**は**学生です",
+   "meaning": "主題標記",
+   "category": "助詞",
+   "example": "私は学生です",
    "source": "文法筆記 › 其他常用助詞"
   },
   {
    "id": "g_1nvpv8l",
    "pattern": "が",
    "meaning": "主語標記",
-   "example": "誰**が**いる？",
+   "category": "助詞",
+   "example": "誰がいる？",
    "source": "文法筆記 › 其他常用助詞"
   },
   {
    "id": "g_1xwyzov",
    "pattern": "に",
    "meaning": "方向、場所",
-   "example": "東京**に**行く",
+   "category": "助詞",
+   "example": "東京に行く",
    "source": "文法筆記 › 其他常用助詞"
   },
   {
    "id": "g_alu0qp",
    "pattern": "で",
    "meaning": "場所、手段",
-   "example": "東京**で**食べる",
+   "category": "助詞",
+   "example": "東京で食べる",
    "source": "文法筆記 › 其他常用助詞"
   },
   {
    "id": "g_v746py",
    "pattern": "と",
    "meaning": "和、引文",
-   "example": "友達**と**行く",
+   "category": "助詞",
+   "example": "友達と行く",
    "source": "文法筆記 › 其他常用助詞"
   },
   {
    "id": "g_uss1iy",
    "pattern": "の",
    "meaning": "所屬、修飾",
-   "example": "私**の**本",
+   "category": "助詞",
+   "example": "私の本",
    "source": "文法筆記 › 其他常用助詞"
   },
   {
    "id": "g_1f3b8yw",
    "pattern": "あったら",
    "meaning": "如果有的話",
+   "category": "動詞活用",
    "example": "原形：ある（〜たら形）",
    "source": "文法筆記 › 〜たら（如果…就…）"
   },
@@ -5416,6 +5485,7 @@ window.NIHONGO_DATA = {
    "id": "g_1awi97c",
    "pattern": "行ったら",
    "meaning": "如果去的話",
+   "category": "動詞活用",
    "example": "原形：行く（〜たら形）",
    "source": "文法筆記 › 〜たら（如果…就…）"
   },
@@ -5423,6 +5493,7 @@ window.NIHONGO_DATA = {
    "id": "g_18sxprt",
    "pattern": "食べたら",
    "meaning": "如果吃的話",
+   "category": "動詞活用",
    "example": "原形：食べる（〜たら形）",
    "source": "文法筆記 › 〜たら（如果…就…）"
   },
@@ -5430,6 +5501,7 @@ window.NIHONGO_DATA = {
    "id": "g_bbod0v",
    "pattern": "暇だったら",
    "meaning": "如果有空的話",
+   "category": "動詞活用",
    "example": "原形：暇（ひま）だ（〜たら形）",
    "source": "文法筆記 › 〜たら（如果…就…）"
   },
@@ -5437,6 +5509,7 @@ window.NIHONGO_DATA = {
    "id": "g_mi25fv",
    "pattern": "教えて",
    "meaning": "告訴我",
+   "category": "動詞活用",
    "example": "原形：教える（て形）",
    "source": "文法筆記 › 〜て（請求形）"
   },
@@ -5444,6 +5517,7 @@ window.NIHONGO_DATA = {
    "id": "g_19yr7n4",
    "pattern": "見て",
    "meaning": "看一下",
+   "category": "動詞活用",
    "example": "原形：見る（て形）",
    "source": "文法筆記 › 〜て（請求形）"
   },
@@ -5451,6 +5525,7 @@ window.NIHONGO_DATA = {
    "id": "g_1a24ksj",
    "pattern": "待って",
    "meaning": "等一下",
+   "category": "動詞活用",
    "example": "原形：待つ（て形）",
    "source": "文法筆記 › 〜て（請求形）"
   },
@@ -5458,6 +5533,7 @@ window.NIHONGO_DATA = {
    "id": "g_p7geym",
    "pattern": "来て",
    "meaning": "過來",
+   "category": "動詞活用",
    "example": "原形：来る（て形）",
    "source": "文法筆記 › 〜て（請求形）"
   },
@@ -5465,35 +5541,40 @@ window.NIHONGO_DATA = {
    "id": "g_1gc3tly",
    "pattern": "何（なに/なん）",
    "meaning": "什麼",
-   "example": "これは**何**ですか。",
+   "category": "疑問詞",
+   "example": "これは何ですか。",
    "source": "文法筆記 › 〜ですか（疑問句）"
   },
   {
    "id": "g_zqq9de",
    "pattern": "何時（なんじ）",
    "meaning": "幾點",
-   "example": "今は**何時**ですか。",
+   "category": "疑問詞",
+   "example": "今は何時ですか。",
    "source": "文法筆記 › 〜ですか（疑問句）"
   },
   {
    "id": "g_n5funq",
    "pattern": "どこ",
    "meaning": "哪裡",
-   "example": "ここは**どこ**ですか。",
+   "category": "疑問詞",
+   "example": "ここはどこですか。",
    "source": "文法筆記 › 〜ですか（疑問句）"
   },
   {
    "id": "g_17dk4wm",
    "pattern": "どんな",
    "meaning": "怎麼樣的",
-   "example": "**どんな**本ですか。",
+   "category": "疑問詞",
+   "example": "どんな本ですか。",
    "source": "文法筆記 › 〜ですか（疑問句）"
   },
   {
    "id": "g_k0e6cj",
    "pattern": "なんていう",
    "meaning": "叫什麼名字",
-   "example": "**なんていう**川ですか。",
+   "category": "疑問詞",
+   "example": "なんていう川ですか。",
    "source": "文法筆記 › 〜ですか（疑問句）"
   }
  ],
