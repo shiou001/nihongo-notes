@@ -15,6 +15,7 @@
 //   一般段落
 //   - 清單項目
 
+import { applyEditorial } from './editorial.mjs';
 const SKIP_HEADINGS = ['🧭 快速導航', '📑 本頁索引'];
 
 // ---------- 第一層：Markdown → page { sections[] } ----------
@@ -182,7 +183,7 @@ export function extractLearningData(pages) {
           for (const r of b.rows) {
             const pattern = stripInline(r[ipat] || ''), meaning = stripInline(r[imean] || '');
             if (!pattern || !meaning) continue;
-            add(grammar, 'g', `${pattern}|${meaning}`, { pattern, meaning, example: iex >= 0 ? r[iex] : '', source: `${page.title} › ${source}` });
+            add(grammar, 'g', `${pattern}|${meaning}`, { pattern, meaning, category: H[ipat], example: iex >= 0 ? stripInline(r[iex]) : '', source: `${page.title} › ${source}` });
           }
           continue;
         }
@@ -194,7 +195,7 @@ export function extractLearningData(pages) {
           for (const r of b.rows) {
             const pattern = stripInline(r[iform] || ''), meaning = stripInline(r[im] || '');
             if (!pattern || !meaning) continue;
-            add(grammar, 'g', `${pattern}|${meaning}`, { pattern, meaning, example: `原形：${r[ibase]}（${H[iform]}）`, source: `${page.title} › ${source}` });
+            add(grammar, 'g', `${pattern}|${meaning}`, { pattern, meaning, category: '動詞活用', example: `原形：${stripInline(r[ibase])}（${H[iform]}）`, source: `${page.title} › ${source}` });
           }
           continue;
         }
@@ -227,7 +228,7 @@ export function extractLearningData(pages) {
 }
 
 export function buildContent(pageMarkdowns, syncedAt = new Date().toISOString()) {
-  const pages = pageMarkdowns.map(parsePageMarkdown);
+  const pages = applyEditorial(pageMarkdowns.map(parsePageMarkdown));
   const data = extractLearningData(pages);
   return { syncedAt, pages, ...data };
 }

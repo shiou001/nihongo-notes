@@ -17,7 +17,8 @@ window.Progress = (() => {
     try { localStorage.setItem(KEY, JSON.stringify(load())); } catch { /* 隱私模式等情況忽略 */ }
     listeners.forEach(f => { try { f(state); } catch {} });
   }
-  const today = () => new Date().toISOString().slice(0, 10);
+  const dayKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const today = () => dayKey();
 
   // 合併兩份進度（跨裝置同步用）。純函式，不動輸入。
   //   items：同一題以「看過次數多」的為準，一樣多就取「最後作答時間晚」的
@@ -46,20 +47,37 @@ window.Progress = (() => {
 
   function stat(id) { return load().items[id] || { seen: 0, correct: 0, wrong: 0, streak: 0, last: null }; }
 
-  function record(id, correct) {
+  function record(id, correct, { assisted = false, now = Date.now() } = {}) {
     const s = load();
     const it = s.items[id] || { seen: 0, correct: 0, wrong: 0, streak: 0, last: null };
-    it.seen++; it.last = Date.now();
-    if (correct) { it.correct++; it.streak++; } else { it.wrong++; it.streak = 0; }
+    if (!it.seen) it.firstSeen = now;
+    it.seen++; it.last = now;
+    it.scheduleVersion = 2;
+    it.retained ||= 0;
+    it.assisted ||= 0;
+    if (correct) it.correct++; else it.wrong++;
+    if (correct && !assisted) {
+      it.streak++;
+      // A repeat only qualifies after both the due date and at least 24 hours.
+      if ((!it.lastQualified || now - it.lastQualified >= 864e5) && (!it.due || now >= it.due)) {
+        it.retained++;
+        it.lastQualified = now;
+        it.due = now + [1, 3, 7, 14, 30][Math.min(it.retained - 1, 4)] * 864e5;
+      }
+    } else {
+      if (assisted) it.assisted++;
+      it.streak = 0; it.retained = 0; it.due = now + 10 * 60e3;
+    }
     s.items[id] = it;
-    if (!s.days.includes(today())) s.days.push(today());
+    const day = dayKey(new Date(now));
+    if (!s.days.includes(day)) s.days.push(day);
     save();
     return it;
   }
 
-  function endSession(score, total, mode) {
+  function endSession(score, total, mode, detail = {}) {
     const s = load();
-    s.sessions.push({ at: Date.now(), score, total, mode });
+    s.sessions.push({ at: Date.now(), score, total, mode, ...detail });
     if (s.sessions.length > 200) s.sessions.splice(0, s.sessions.length - 200);
     save();
   }
@@ -68,12 +86,12 @@ window.Progress = (() => {
   function streakDays() {
     const days = new Set(load().days);
     let n = 0; const d = new Date();
-    if (!days.has(d.toISOString().slice(0, 10))) d.setDate(d.getDate() - 1);
-    while (days.has(d.toISOString().slice(0, 10))) { n++; d.setDate(d.getDate() - 1); }
+    if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1);
+    while (days.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
     return n;
   }
 
   function reset() { state = { items: {}, days: [], sessions: [] }; save(); }
 
-  return { load, save, stat, record, endSession, streakDays, reset, merge, replace, onChange };
+  return { load, save, stat, record, endSession, streakDays, reset, merge, replace, onChange, dayKey };
 })();
