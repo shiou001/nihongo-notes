@@ -1,4 +1,5 @@
-// app.js — 路由與各視圖（首頁 / 學習地圖 / 筆記 / 測驗 / 五十音）
+// app.js — 路由與各視圖
+// 主線：今日 → 課程（單元：讀、練、達標）→ 複習；筆記、五十音、漢字、聲音、同步都歸在參考資料。
 (() => {
   const $ = s => document.querySelector(s);
   const app = () => $('#app');
@@ -44,25 +45,43 @@
     const sources = [...DATA().vocab, ...DATA().grammar, ...DATA().phrases].filter(x => x.source?.startsWith(page.title + ' › '));
     return sources.length ? `<a class="btn small" href="#/quiz?page=${encodeURIComponent(page.title)}&levels=all">練習本頁內容</a>` : `<a class="btn small" href="#/quiz?levels=${level}">練習 ${level} 單字</a>`;
   }
-  function viewHome() {
+  // 全站到期的題目數（不含單元的「已讀」標記）
+  function dueCount(now = Date.now()) {
+    return Object.entries(Progress.load().items).filter(([id, s]) => !id.startsWith('u_') && s.seen && (!s.due || s.due <= now)).length;
+  }
+  const STATUS_ICON = { done: '✅', active: '▶', todo: '○' };
+  function unitRow(u, cur) {
+    const st = Curriculum.stats(u);
+    const meta = u.readOnly ? (st.read ? '已讀' : '純閱讀') : `${st.learned}/${st.total} 已學`;
+    return `<li class="${st.status} ${cur && cur.key === u.key ? 'current' : ''}"><a href="#/unit/${esc(u.key)}">
+      <span class="u-num">${u.index}</span><span class="u-kind tag">${esc(u.icon)} ${esc(u.kind)}</span>
+      <span class="u-title">${esc(u.title)}${u.desc ? `<small>${esc(u.desc)}</small>` : ''}</span>
+      <span class="u-meta">${meta}</span><span class="u-status" aria-label="${st.status}">${STATUS_ICON[st.status]}</span></a></li>`;
+  }
+
+  // ────────────────────────────── 今日 ──────────────────────────────
+  function viewToday() {
     const d = DATA(); const o = Quiz.overallStats(); const lv = currentLevel();
-    const ls = lv ? Quiz.levelStats(lv.level) : null;
-    const recent = Progress.load().sessions.slice(-5).reverse();
     const profile = Study.profile();
+    const unit = Curriculum.current(profile.level);
+    const us = unit ? Curriculum.stats(unit) : null;
+    const sum = Curriculum.levelSummary(profile.level);
+    const list = unit ? Curriculum.all(profile.level) : [];
+    const upcoming = unit ? list.slice(unit.index, unit.index + 4) : [];
     const daily = Quiz.buildQuestions(Study.dailyOptions());
-    const due = DATA().vocab.filter(v => v.level === profile.level && Progress.stat(v.id).seen && (!Progress.stat(v.id).due || Progress.stat(v.id).due <= Date.now())).length;
-    const newCount = daily.filter(q => !Progress.stat(q.id).seen).length;
+    const dueVocab = d.vocab.filter(v => v.level === profile.level && Progress.stat(v.id).seen && (!Progress.stat(v.id).due || Progress.stat(v.id).due <= Date.now())).length;
+    const due = dueCount();
     return `
     <section class="hero">
       <div class="hero-mascot">${doodle('daruma')}</div>
       <div>
         <p class="kicker">${greeting()}！</p>
         <h1>にほんごノート</h1>
-        <p class="lead">今天的 ${profile.level} 練習：${due} 個到期單字，最多新學 ${newCount} 個。</p>
-        <p>先複習，再學新內容。${daily.length ? `這一輪 ${daily.length} 題，預計約 ${Math.max(2, Math.ceil(daily.length * .6))} 分鐘。` : '目前沒有到期或待新學的題目，可以閱讀筆記或自選練習。'}</p>
+        <p class="lead">${unit ? `你在 ${profile.level} 第 ${unit.index} / ${unit.total} 單元：${esc(unit.title)}。` : `${profile.level} 還沒有課程內容。`}${due ? `另有 ${due} 題到期複習。` : '目前沒有到期的複習。'}</p>
+        <p>建議順序：先把到期的複習做完，再繼續單元。${daily.length ? `今日練習 ${daily.length} 題，約 ${Math.max(2, Math.ceil(daily.length * .6))} 分鐘。` : ''}</p>
         <div class="actions">
-          <a class="btn primary" href="#/quiz?mode=daily">✏️ ${daily.length ? `開始今日 ${daily.length} 題` : '查看今日複習'}</a>
-          <a class="btn" href="#/map">🗺️ 看學習地圖</a>
+          ${unit ? `<a class="btn primary" href="#/unit/${esc(unit.key)}">▶ 繼續單元</a>` : ''}
+          <a class="btn ${unit ? '' : 'primary'}" href="#/quiz?mode=daily">🔁 ${daily.length ? `今日複習 ${daily.length} 題` : '查看今日複習'}</a>
         </div>
       </div>
     </section>
@@ -70,78 +89,146 @@
     <details class="card profile" ${profile.configured ? '' : 'open'}><summary>${profile.configured ? `學習設定：${profile.level}・${profile.goal}・每週 ${profile.weekly} 個新單字` : '第一次使用：設定你的程度和目標'}</summary>${studyForm()}</details>
 
     <section class="stats">
-      <div class="stat card tape"><div class="num">${due}</div><div class="lbl">${profile.level} 到期單字</div>${doodle('onigiri')}</div>
-      <div class="stat card tape"><div class="num">${o.mastered}</div><div class="lbl">跨日熟練項目</div>${doodle('star')}</div>
-      <div class="stat card tape"><div class="num">${Progress.streakDays()}</div><div class="lbl">連續學習天</div>${doodle('torii')}</div>
+      <div class="stat card tape"><div class="num">${dueVocab}</div><div class="lbl">${profile.level} 到期單字</div>${doodle('onigiri')}</div>
+      <div class="stat card tape"><div class="num">${sum.done}<small>/${sum.total}</small></div><div class="lbl">${profile.level} 單元完成</div>${doodle('torii')}</div>
+      <div class="stat card tape"><div class="num">${Progress.streakDays()}</div><div class="lbl">連續學習天</div>${doodle('star')}</div>
       <div class="stat card tape"><div class="num">${o.weak}</div><div class="lbl">弱點待複習</div>${doodle('cloud')}</div>
     </section>
 
     <section class="grid2">
       <div class="card">
-        <h2>🎯 目前階段：${lv ? esc(lv.level + ' ' + lv.title) : '—'}</h2>
-        ${lv ? `<p>${esc(lv.goal)}</p>
-        <div class="bar"><div class="fill" style="width:${ls.pct}%;background:${lv.color}"></div></div>
-        <p class="meta">本站 ${lv.level} 收錄 ${ls.total} 個單字，跨日熟練 ${ls.mastered} 個（${ls.pct}%）。${lv.partial ? '本級為部分筆記，仍在補充。' : ''}</p>
-        ${masteryHelp()}
-        <h3>本週建議</h3>
-        <ul class="todo"><li>每週新學 ${profile.weekly} 個單字；到期項目另外複習。</li>${weeklyLinks(lv)}</ul>
-        <a class="btn small" href="#/quiz?levels=${lv.level}">開始 ${lv.level} 測驗</a>` : ''}
+        <h2>🎯 目前單元</h2>
+        ${unit ? `<p><span class="tag">${esc(unit.icon)} ${esc(unit.kind)}</span> <b>${esc(unit.title)}</b></p><p class="meta">${esc(unit.desc)}</p>
+        <div class="bar"><div class="fill" style="width:${us.pct}%;background:${lv?.color || ''}"></div></div>
+        <p class="meta">${unit.readOnly ? (us.read ? '已讀完' : '讀完後按「我讀完了」') : `${us.learned} / ${us.total} 項已學・跨日熟練 ${us.mastered}・弱點 ${us.weak}`}</p>
+        <div class="actions"><a class="btn small primary" href="#/unit/${esc(unit.key)}">進入單元</a><a class="btn small" href="#/course/${profile.level}">看整個 ${profile.level} 課程</a></div>` : `<p class="meta">這一級目前沒有單元。到 <a href="#/course">課程</a> 看其他等級。</p>`}
       </div>
       <div class="card">
-        <h2>📖 筆記分頁</h2>
-        <ul class="pagelist">
-          ${d.pages.map((p, i) => `<li><a href="#/notes/${i}"><span class="ico">${esc(p.icon)}</span>${esc(p.title)}<span class="cnt">${p.sections.length} 段</span></a></li>`).join('')}
-        </ul>
+        <h2>📚 接下來</h2>
+        ${upcoming.length ? `<ol class="units compact">${upcoming.map(u => unitRow(u, null)).join('')}</ol>` : '<p class="meta">這一級的單元都完成了 🎉</p>'}
       </div>
     </section>
 
-    <p class="meta">教材來自作者的 Notion 筆記與公開字表，共 ${o.vocab} 個單字（筆記 ${o.notionVocab}・公開 ${o.externalVocab}）。教材同步：${fmtDate(d.syncedAt)} ・ ${syncHint()}</p>
+    <p class="meta">教材來自作者的 Notion 筆記與公開字表，共 ${o.vocab} 個單字（筆記 ${o.notionVocab}・公開 ${o.externalVocab}）。教材同步：${fmtDate(d.syncedAt)} ・ ${syncHint()}</p>`;
+  }
+
+  // ────────────────────────────── 課程 ──────────────────────────────
+  function viewCourse(level) {
+    if (!Curriculum.LEVELS.includes(level)) level = Study.profile().level;
+    const p = PLAN().find(x => x.level === level) || {};
+    const list = Curriculum.all(level), cur = Curriculum.current(level), sum = Curriculum.levelSummary(level);
+    const s = Quiz.levelStats(level), ks = Quiz.kanjiStats(level);
+    const tabs = Curriculum.LEVELS.map(l => { const z = Curriculum.levelSummary(l); return `<a class="btn small ${l === level ? 'primary' : ''}" href="#/course/${l}">${l} <small>${z.done}/${z.total}</small></a>`; }).join('');
+    return `
+    <section class="page-head"><h1>📚 課程</h1>
+      <p class="lead">每一級照順序排成單元：讀筆記、練題目、達標後往下走。單字課和漢字課會穿插在文法、會話之間。N3～N1 為部分筆記，仍在補充。</p>
+      <div class="actions">${tabs}</div>
+    </section>
+    <section class="card map-card">
+      <div class="map-head"><div class="map-mascot">${doodle(p.mascot || 'daruma')}</div>
+        <div><h2>${level} <small>${esc(p.title || '')}</small></h2><p>${esc(p.goal || '')}</p>${p.partial ? '<span class="tag">部分筆記・持續補充</span>' : ''}</div></div>
+      <div class="bar"><div class="fill" style="width:${sum.pct}%;background:${p.color || ''}"></div></div>
+      <p class="meta">${sum.done} / ${sum.total} 單元完成・單字跨日熟練 ${s.mastered} / ${s.total}・漢字 ${ks.mastered} / ${ks.total}${cur ? `・目前在第 ${cur.index} 單元` : ''}</p>
+      ${cur ? `<div class="actions"><a class="btn small primary" href="#/unit/${esc(cur.key)}">▶ 繼續第 ${cur.index} 單元</a>${level !== Study.profile().level ? `<span class="meta">你的學習設定是 ${Study.profile().level}，可在首頁調整。</span>` : ''}</div>` : ''}
+      ${masteryHelp()}
+    </section>
+    ${list.length ? `<ol class="units card">${list.map(u => unitRow(u, cur)).join('')}</ol>` : '<div class="card"><p>這一級還沒有課程內容。可以在 Notion 加筆記，或在 <code>data/curriculum.js</code> 加單元。</p></div>'}`;
+  }
+
+  // ────────────────────────────── 單元 ──────────────────────────────
+  function unitReadHtml(u) {
+    if (u.auto === 'vocab') {
+      return `<article class="card unit-read"><h2>本課單字 <small>${u.items.vocab.length} 個</small></h2><p class="meta">先讀一遍，點 🔊 聽發音，再遮住意思回想。</p>
+        <div class="tablewrap"><table class="vocab-table"><thead><tr><th>單字</th><th>讀音</th><th>意思</th><th></th></tr></thead><tbody>
+        ${u.items.vocab.map(v => `<tr><td lang="ja">${esc(v.word)}</td><td lang="ja">${esc(v.reading)}</td><td>${esc(v.meaning)}${v.ai ? ' <span class="tag">AI 翻譯</span>' : ''}</td><td><button class="btn tiny" data-say="${esc(v.reading || v.word)}">🔊</button></td></tr>`).join('')}
+        </tbody></table></div></article>`;
+    }
+    if (u.auto === 'kanji') {
+      const A = window.KanjiAlign;
+      return `<article class="card unit-read"><h2>本課漢字 <small>${u.kanji.length} 字</small></h2><p class="meta">點字可以看它在你單字裡的用法。紅色小字是繁體寫法。</p>
+        <div class="kj-grid">${u.kanji.map(k => `<a class="kj ${Quiz.kanjiStatus(k)}" href="#/kanji/${k.level}/${encodeURIComponent(k.k)}" title="${esc(k.meanings.join(', '))}"><span class="big">${esc(k.k)}</span>${k.trad.length ? `<span class="trad">${esc(k.trad[0])}</span>` : ''}</a>`).join('')}</div>
+        <ul class="kd-words">${u.kanji.map(k => `<li><span class="kd-w">${esc(k.k)}</span> <span class="meta">音 ${esc(k.on.map(A.toKata).join('・') || '—')}・訓 ${esc((k.kunTop || k.kun).slice(0, 3).map(([s, o]) => o ? `${s}(${o})` : s).join('・') || '—')}</span> ${esc(k.meanings.slice(0, 2).join(', '))}</li>`).join('')}</ul></article>`;
+    }
+    const parts = u.read.flatMap(ref => Curriculum.sections(ref));
+    if (!parts.length) return '<article class="card unit-read"><p class="meta">這個單元沒有對應的筆記段落。檢查 data/curriculum.js 的 read 設定。</p></article>';
+    return parts.map(({ page, section, index }) => `<article class="card unit-read ${section.level === 3 ? 'sub' : ''}">
+      ${section.heading ? `<h${section.level === 3 ? 3 : 2}>${rich(section.heading)}</h${section.level === 3 ? 3 : 2}>` : ''}
+      ${section.blocks.map(renderBlock).join('')}
+      <p class="meta"><a href="#/notes/${DATA().pages.indexOf(page)}?section=${index}">在筆記裡看這段</a></p></article>`).join('');
+  }
+  function viewUnit(key) {
+    const u = Curriculum.get(key);
+    if (!u) return `<div class="card"><h2>找不到這個單元</h2><a class="btn" href="#/course">回課程</a></div>`;
+    const st = Curriculum.stats(u), list = Curriculum.all(u.level);
+    const prev = list[u.index - 2], next = list[u.index];
+    const lv = PLAN().find(x => x.level === u.level) || {};
+    return `
+    <section class="page-head">
+      <p class="meta"><a href="#/course/${u.level}">📚 ${u.level} 課程</a> › 第 ${u.index} / ${u.total} 單元</p>
+      <h1><span class="tag">${esc(u.icon)} ${esc(u.kind)}</span> ${esc(u.title)}</h1>
+      ${u.desc ? `<p class="lead">${esc(u.desc)}</p>` : ''}
+    </section>
+    <section class="card tape">
+      <div class="bar"><div class="fill" style="width:${st.pct}%;background:${lv.color || ''}"></div></div>
+      <p class="meta">${u.readOnly ? (st.read ? '✅ 已讀完' : '純閱讀單元，讀完按下面的「我讀完了」') : `${st.learned} / ${st.total} 項已學（最近一次答對）・跨日熟練 ${st.mastered}・弱點 ${st.weak}${st.done ? '・✅ 已達標' : '・80% 已學即達標'}`}</p>
+      <div class="actions">
+        ${u.readOnly ? (st.read ? '' : `<button class="btn primary" id="mark-read" data-unit="${esc(u.key)}">✅ 我讀完了</button>`) : `<a class="btn primary" href="#/quiz?unit=${esc(u.key)}">✏️ 練習這個單元 <small>${st.total} 項</small></a>${st.weak ? `<a class="btn" href="#/quiz?unit=${esc(u.key)}&weak=1">只練弱點 (${st.weak})</a>` : ''}`}
+        ${u.kana.length ? '<a class="btn" href="#/kana">🈁 聽五十音</a>' : ''}
+      </div>
+    </section>
+    <h2 class="unit-h">📖 讀</h2>
+    ${unitReadHtml(u)}
+    <div class="actions unit-nav">
+      ${prev ? `<a class="btn small" href="#/unit/${esc(prev.key)}">← 第 ${prev.index} 單元：${esc(prev.title)}</a>` : ''}
+      ${next ? `<a class="btn small" href="#/unit/${esc(next.key)}">第 ${next.index} 單元：${esc(next.title)} →</a>` : '<span class="meta">這是最後一個單元 🎌</span>'}
+    </div>`;
+  }
+
+  // ────────────────────────────── 複習 ──────────────────────────────
+  function viewReview() {
+    const o = Quiz.overallStats(); const due = dueCount();
+    const recent = Progress.load().sessions.slice(-8).reverse();
+    const daily = Quiz.buildQuestions(Study.dailyOptions());
+    const rows = Curriculum.LEVELS.map(l => { const z = Curriculum.levelSummary(l), s = Quiz.levelStats(l), k = Quiz.kanjiStats(l); return `<tr><td><a href="#/course/${l}">${l}</a></td><td>${z.done} / ${z.total}</td><td>${s.mastered} / ${s.total}</td><td>${k.mastered} / ${k.total}</td></tr>`; }).join('');
+    return `
+    <section class="page-head"><h1>🔁 複習</h1><p class="lead">到期的題目會在這裡等你。不管在哪個單元學的，到期就一起複習。</p></section>
+    <section class="stats">
+      <div class="stat card tape"><div class="num">${due}</div><div class="lbl">到期待複習</div>${doodle('onigiri')}</div>
+      <div class="stat card tape"><div class="num">${o.weak}</div><div class="lbl">弱點</div>${doodle('cloud')}</div>
+      <div class="stat card tape"><div class="num">${o.mastered}</div><div class="lbl">跨日熟練</div>${doodle('star')}</div>
+      <div class="stat card tape"><div class="num">${Progress.streakDays()}</div><div class="lbl">連續學習天</div>${doodle('torii')}</div>
+    </section>
     <section class="card">
-      <h2>🕰️ 最近測驗</h2>
-      ${recent.length ? `<ul class="sessions">${recent.map(s => `<li><span>${fmtDate(s.at)}</span><b>${s.score} / ${s.total}</b><span class="tag">${esc(s.mode)}</span></li>`).join('')}</ul>` : '<p class="meta">還沒有紀錄，來做第一份測驗吧！</p>'}
+      <div class="actions">
+        <a class="btn primary" href="#/quiz?mode=daily">🔁 ${Study.profile().level} 今日複習${daily.length ? ` (${daily.length})` : ''}</a>
+        <a class="btn ${due ? '' : 'disabled'}" href="#/quiz?mode=due">📅 全部到期 (${due})</a>
+        <a class="btn ${o.weak ? '' : 'disabled'}" href="#/quiz?mode=weak">💪 只練弱點 (${o.weak})</a>
+        <a class="btn" href="#/quiz">🎛️ 自選範圍</a>
+      </div>
+      <p class="meta">今日複習：你設定的等級，先出到期的，再帶一點新單字。全部到期：所有等級、所有題型，只出到期的。</p>
+      ${masteryHelp()}
+    </section>
+    <section class="card"><h2>各級進度</h2><div class="tablewrap"><table><thead><tr><th>等級</th><th>單元完成</th><th>單字跨日熟練</th><th>漢字跨日熟練</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+    <section class="card">
+      <h2>🕰️ 最近練習</h2>
+      ${recent.length ? `<ul class="sessions">${recent.map(s => `<li><span>${fmtDate(s.at)}</span><b>${s.score} / ${s.total}</b><span class="tag">${esc(s.mode)}</span></li>`).join('')}</ul>` : '<p class="meta">還沒有紀錄。</p>'}
     </section>`;
   }
 
-  // ────────────────────────────── 學習地圖 ──────────────────────────────
-  function weeklyLinks(p) {
-    const activities = Study.profile().goal === '日常會話' ? [['常用會話', '每日聽讀一組會話，再遮住中文回想'], ['文法筆記', '每週練習一個文法單元']] : [['文法筆記', '每週閱讀文法並完成例句填空'], ['閱讀練習', '每週閱讀短文並用自己的話複述']];
-    const links = activities.map(([title, label]) => { const i = DATA().pages.findIndex(x => x.title === title); return i < 0 ? '' : `<li><a href="#/notes/${i}">${label}</a></li>`; }).join('');
-    return (p.level === 'N5' ? '<li><a href="#/kana">每天聽讀 10 個假名，再做假名練習</a></li>' : '') + links;
-  }
-  function viewMap() {
-    const cards = PLAN().map((p, i) => {
-      const s = Quiz.levelStats(p.level);
-      const ks = Quiz.kanjiStats(p.level);
-      const done = s.total && s.pct >= 80;
-      const estimate = Study.estimate(s.total, s.mastered);
-      return `
-      <li class="map-node ${i % 2 ? 'right' : 'left'} ${done ? 'done' : ''}">
-        <div class="gate" style="--c:${p.color}">${doodle('torii')}<span>${p.level}</span></div>
-        <div class="card map-card">
-          <div class="map-head">
-            <div class="map-mascot">${doodle(p.mascot)}</div>
-            <div><h2>${p.level} <small>${esc(p.title)}</small></h2><p class="meta">本站收錄 ${s.total} 個單字（筆記 ${s.notion}・公開 ${s.external}）</p>${p.partial ? '<span class="tag">部分筆記・持續補充</span>' : ''}</div>
-          </div>
-          <p>${esc(p.goal)}</p>
-          <div class="bar"><div class="fill" style="width:${s.pct}%;background:${p.color}"></div></div>
-          <p class="meta">跨日熟練 ${s.mastered}／看過 ${s.seen}／弱點 ${s.weak}${done ? ' ・ 本站收錄範圍達標' : ''}</p>
-          <p>本站 80% 目標：${estimate.target} 個，尚差 ${estimate.remaining} 個。依每週 ${Study.profile().weekly} 個，需約 ${estimate.weeks} 週接觸剩餘目標，另需跨日複習；這不是通過 ${p.level} 的時間預測。</p>
-          ${ks.total ? `<p class="meta">🀄 <a href="#/kanji/${p.level}">漢字 ${ks.total} 字</a>，熟練 ${ks.mastered}</p><div class="bar thin"><div class="fill" style="width:${ks.pct}%;background:${p.color}"></div></div>` : ''}
-          <details><summary>每週重點與里程碑</summary>
-            <ul class="todo"><li><a href="#/quiz?levels=${p.level}">本週 ${Study.profile().weekly} 個新單字與到期複習</a></li>${weeklyLinks(p)}</ul>
-            <ul class="milestones"><li>本站收錄單字跨日熟練 ${estimate.target} 個</li><li>能遮住提示說出讀音與意思，再用短句練習</li></ul>
-          </details>
-          <div class="actions">
-            <a class="btn small primary" href="#/quiz?levels=${p.level}">開始 ${p.level} 測驗</a>
-            ${s.weak ? `<a class="btn small" href="#/quiz?levels=${p.level}&weak=1">只練弱點 (${s.weak})</a>` : ''}
-          </div>
-        </div>
-      </li>`;
-    }).join('');
+  // ────────────────────────────── 參考資料 ──────────────────────────────
+  function viewReference() {
+    const d = DATA(); const o = Quiz.overallStats();
     return `
-    <section class="page-head"><h1>🗺️ 分級學習地圖</h1><p class="lead">追蹤本站教材的練習進度。N3～N1 為部分筆記；所有級別進度均不代表 JLPT 能力認證。</p><details class="card"><summary>調整學習目標與每週份量</summary>${studyForm()}</details>${masteryHelp()}</section>
-    <ol class="map">${cards}</ol>
-    <div class="map-end">${doodle('fuji')}<p>ゴール！🎌</p></div>`;
+    <section class="page-head"><h1>📖 參考資料</h1><p class="lead">課程用到的原始資料都在這裡，隨時查。想有系統地學，從 <a href="#/course">課程</a> 開始。</p></section>
+    <div class="ref-grid">
+      <a class="card ref" href="#/notes/0"><h2>📓 筆記</h2><p>你的 Notion 筆記，${d.pages.length} 頁，可全文搜尋。</p></a>
+      <a class="card ref" href="#/kana"><h2>🈁 五十音</h2><p>平假名、片假名對照表，點一下會唸。</p></a>
+      <a class="card ref" href="#/kanji"><h2>🀄 漢字</h2><p>JLPT 漢字 ${(d.kanji || []).length} 字，讀音、繁體對照、用到它的單字。</p></a>
+      <a class="card ref" href="#/quiz"><h2>🎛️ 自選測驗</h2><p>自己挑題型、等級、來源，共 ${o.vocab} 個單字可練。</p></a>
+      <a class="card ref" href="#/voice"><h2>🔊 聲音</h2><p>換朗讀的聲音和語氣。</p></a>
+      <a class="card ref" href="#/sync"><h2>☁️ 跨裝置同步</h2><p>用同步碼把進度接到手機。</p></a>
+    </div>
+    <section class="card"><h2>筆記分頁</h2><ul class="pagelist">${d.pages.map((p, i) => `<li><a href="#/notes/${i}"><span class="ico">${esc(p.icon)}</span>${esc(p.title)}<span class="cnt">${p.sections.length} 段</span></a></li>`).join('')}</ul></section>`;
   }
 
   // ────────────────────────────── 筆記 ──────────────────────────────
@@ -259,7 +346,7 @@
 
   function startQuiz(opts, mode) {
     quiz.qs = Quiz.buildQuestions(opts); quiz.i = 0; quiz.score = 0; quiz.answered = false; quiz.mode = mode; quiz.wrong = []; quiz.answers = [];
-    if (!quiz.qs.length) { app().innerHTML = `<div class="card"><h2>${opts.daily ? '今日到期複習與新學份量已完成' : '沒有符合的題目'}</h2><p>${opts.daily ? '未到期的題目會保留到下次。你也可以自選練習，但提前重做不增加跨日熟練次數。' : '這個範圍暫無可用題目，請選擇其他題型或單元。'}</p><a class="btn" href="#/quiz">自選練習</a><a class="btn" href="#/">回首頁</a></div>`; return; }
+    if (!quiz.qs.length) { app().innerHTML = `<div class="card"><h2>${opts.daily ? '今日到期複習與新學份量已完成' : '沒有符合的題目'}</h2><p>${opts.daily ? '未到期的題目會保留到下次。你也可以自選練習，但提前重做不增加跨日熟練次數。' : '這個範圍暫無可用題目，請選擇其他題型或單元。'}</p>${quiz.unitKey ? `<a class="btn" href="#/unit/${esc(quiz.unitKey)}">回到單元</a>` : ''}<a class="btn" href="#/quiz">自選練習</a><a class="btn" href="#/">回今日</a></div>`; return; }
     renderQuestion();
   }
 
@@ -336,6 +423,15 @@
     if (quiz.i < quiz.qs.length) renderQuestion(); else renderResult();
   }
 
+  // 結果頁的主要按鈕：單元練習 → 回單元、再練、達標就下一單元；其他 → 再來一次
+  function unitResultActions() {
+    const u = quiz.unitKey ? Curriculum.get(quiz.unitKey) : null;
+    if (!u) return '<a class="btn primary" href="#/quiz">再來一次</a>';
+    const st = Curriculum.stats(u), next = Curriculum.all(u.level)[u.index];
+    return `<a class="btn primary" href="#/unit/${esc(u.key)}">回到單元（${st.learned}/${st.total} 已學${st.done ? '・✅ 達標' : ''}）</a>
+      <a class="btn" href="#/quiz?unit=${esc(u.key)}">再練一次</a>
+      ${st.done && next ? `<a class="btn" href="#/unit/${esc(next.key)}">下一單元 →</a>` : ''}`;
+  }
   function renderResult() {
     const assisted = quiz.answers.filter(a => a.assisted).length;
     const correct = quiz.answers.filter(a => a.ok).length;
@@ -350,9 +446,9 @@
         <h1>${quiz.score} / ${quiz.qs.length}</h1>
         <p class="lead">獨立答對 ${quiz.score} 題；含提示／先學後答共 ${correct} 題正確。</p><p>使用提示或剛學過的題目 ${assisted} 題。當次答對與跨日熟練分開計算。</p>
         <div class="actions">
-          <a class="btn primary" href="#/quiz">再來一次</a>
+          ${unitResultActions()}
           ${quiz.wrong.length ? `<button class="btn" id="retry-wrong">再練錯題與提示題 (${quiz.wrong.length})</button>` : ''}
-          <a class="btn" href="#/">回首頁</a>
+          <a class="btn" href="#/">回今日</a>
         </div>
       </div>
       <section class="card"><h2>各項練習表現</h2><ul>${Object.entries(groups).map(([type, g]) => `<li>${esc(type)}：獨立答對 ${g.independent}/${g.total}</li>`).join('')}</ul>${masteryHelp()}</section>
@@ -524,23 +620,40 @@
     const params = new URLSearchParams(qs);
     const seg = pathPart.split('/').filter(Boolean);
     const view = seg[0] || 'home';
+    // 導覽列只有四項，其他頁面歸到對應的那一項
+    const navView = { home: 'home', course: 'course', map: 'course', unit: 'course', review: 'review', quiz: 'review', reference: 'reference', notes: 'reference', kana: 'reference', kanji: 'reference', voice: 'reference', sync: 'reference' }[view] || 'home';
     document.body.classList.remove('nav-open');
     $('#nav-toggle')?.setAttribute('aria-expanded', 'false');
-    quiz.qs = [];
-    document.querySelectorAll('nav.top a').forEach(a => { const active = a.dataset.view === view; a.classList.toggle('active', active); if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    quiz.qs = []; quiz.unitKey = '';
+    document.querySelectorAll('nav.top a').forEach(a => { const active = a.dataset.view === navView; a.classList.toggle('active', active); if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     window.scrollTo(0, 0);
     switch (view) {
-      case 'map': app().innerHTML = viewMap(); break;
+      case 'map': case 'course': app().innerHTML = viewCourse(seg[1] || ''); break;
+      case 'unit': app().innerHTML = viewUnit(decodeURIComponent(seg[1] || '')); break;
+      case 'review': app().innerHTML = viewReview(); break;
+      case 'reference': app().innerHTML = viewReference(); break;
       case 'notes': app().innerHTML = viewNotes(seg[1], params.get('q') || ''); break;
       case 'kana': app().innerHTML = viewKana(seg[1] || 'hira'); break;
       case 'sync': app().innerHTML = viewSync(); break;
       case 'voice': app().innerHTML = viewVoice(); break;
       // 等級也要解碼：「其他」在網址裡會變成 %E5%85%B6%E4%BB%96
       case 'kanji': app().innerHTML = viewKanji(decodeURIComponent(seg[1] || ''), decodeURIComponent(seg[2] || '')); break;
-      case 'quiz':
-        if (params.get('mode') === 'daily') { startQuiz(Study.dailyOptions(), `${Study.profile().level} 今日複習`); break; }
+      case 'quiz': {
+        const unitKey = params.get('unit');
+        if (unitKey) {
+          const u = Curriculum.get(unitKey);
+          if (!u) { app().innerHTML = viewUnit(unitKey); break; }
+          quiz.unitKey = u.key;
+          startQuiz(Curriculum.quizOpts(u, { weakOnly: params.get('weak') === '1', count: +params.get('count') || 10 }), `${u.level} 第 ${u.index} 單元`);
+          break;
+        }
+        const mode = params.get('mode');
+        if (mode === 'daily') { startQuiz(Study.dailyOptions(), `${Study.profile().level} 今日複習`); break; }
+        if (mode === 'due') { startQuiz({ types: Object.keys(Quiz.TYPES), levels: [...Quiz.LEVELS], daily: true, newLimit: 0, count: 20 }, '全部到期'); break; }
+        if (mode === 'weak') { startQuiz({ types: Object.keys(Quiz.TYPES), levels: [...Quiz.LEVELS], weakOnly: true, count: 20 }, '弱點複習'); break; }
         app().innerHTML = viewQuizSetup(params); break;
-      default: app().innerHTML = viewHome();
+      }
+      default: app().innerHTML = viewToday();
     }
     labelAudio();
     if (view === 'notes' && /^\d+$/.test(params.get('section') || '')) document.getElementById('lesson-' + params.get('section'))?.scrollIntoView();
@@ -572,6 +685,8 @@
     if (e.target.closest('#nav-toggle')) {
       const open = document.body.classList.toggle('nav-open'); $('#nav-toggle').setAttribute('aria-expanded', String(open)); return;
     }
+    const mr = e.target.closest('#mark-read');
+    if (mr) { const u = Curriculum.get(mr.dataset.unit); if (u) { Curriculum.markRead(u); app().innerHTML = viewUnit(u.key); } return; }
     if (e.target.closest('#learned-next')) { const q = quiz.qs[quiz.i]; q.previewSeen = true; q.usedHint = true; return renderQuestion(); }
     if (e.target.closest('#show-hint')) { const q = quiz.qs[quiz.i]; if (!q || quiz.answered) return; q.usedHint = true; $('#question-hint').textContent = q.hint + '（本題改計提示練習）'; $('#question-hint').hidden = false; $('#show-hint').setAttribute('aria-expanded', 'true'); return; }
     if (e.target.closest('#dont-know')) return answer('');

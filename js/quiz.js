@@ -127,6 +127,7 @@ window.Quiz = (() => {
       const t = TYPES[tk];
       const qid = it => (t.id ? t.id(it) : it.id);
       let items = poolFor(tk, opts.levels, opts.origins);
+      if (opts.ids) items = items.filter(x => opts.ids.has(x.id));   // 單元練習：只出這個單元的題目
       if (opts.source) items = items.filter(x => x.source === opts.source);
       if (opts.page) items = items.filter(x => x.source?.startsWith(opts.page + ' › '));
       if (opts.weakOnly) items = items.filter(x => isWeak(Progress.stat(qid(x))));

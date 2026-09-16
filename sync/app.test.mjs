@@ -25,7 +25,7 @@ async function app(hash = '#/') {
     Voice: { onVoicesChanged() {}, speak() {}, voices: () => [], get: () => ({}) },
   });
   ctx.window = ctx;
-  const scripts = ['data/content.js', 'data/external.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/doodles.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'js/app.js'];
+  const scripts = ['data/content.js', 'data/external.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/doodles.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/app.js'];
   for (const f of scripts) vm.runInContext(await readFile(new URL(f, root), 'utf8'), ctx, { filename: f });
   events.DOMContentLoaded();
   return { ctx, document,
@@ -35,10 +35,11 @@ async function app(hash = '#/') {
   };
 }
 
-test('首頁、地圖、筆記和測驗設定可渲染；沒有失效的計畫欄位', async () => {
+test('今日、課程、單元、複習、參考資料、筆記、測驗設定可渲染；沒有失效的計畫欄位', async () => {
   const a = await app();
   assert.match(a.document.querySelector('main').textContent, /到期單字/);
-  for (const hash of ['#/map', '#/notes/3', '#/quiz', '#/kana', '#/kanji/N5']) {
+  assert.match(a.document.querySelector('main').textContent, /第 1 \/ \d+ 單元/);
+  for (const hash of ['#/map', '#/course/N4', '#/unit/N5-particles', '#/unit/N5-vocab-1', '#/unit/N5-kanji-1', '#/review', '#/reference', '#/notes/3', '#/quiz', '#/kana', '#/kanji/N5']) {
     a.route(hash);
     assert.ok(a.document.querySelector('main').textContent.length > 100, hash);
     assert.ok(!a.document.querySelector('main').innerHTML.includes('undefined'), hash);
@@ -46,6 +47,33 @@ test('首頁、地圖、筆記和測驗設定可渲染；沒有失效的計畫�
   a.route('#/map');
   assert.match(a.document.querySelector('main').textContent, /部分筆記/);
   assert.ok(!a.document.querySelector('main').textContent.includes('data/plan.js'));
+  assert.equal(a.document.querySelector('nav.top a.active').textContent.trim(), '📚 課程');
+  assert.ok(a.document.querySelectorAll('.units li').length > 20);
+  assert.equal(a.document.querySelector('.units li.current .u-num').textContent, '1');
+});
+
+test('單元頁：讀筆記段落、練習只出單元題、達標後結果頁給下一單元', async () => {
+  const a = await app('#/unit/N5-greetings');
+  const main = () => a.document.querySelector('main');
+  assert.match(main().textContent, /打招呼/);
+  assert.ok(main().querySelectorAll('.unit-read table').length >= 3, '三個會話段落的表格');
+  assert.ok(main().querySelector('a[href="#/quiz?unit=N5-greetings"]'));
+  a.route('#/quiz?unit=N5-greetings');
+  assert.match(a.document.querySelector('.quiz-top').textContent, /會話 → 中文/);
+  const ids = new Set(a.ctx.Curriculum.questionIds(a.ctx.Curriculum.get('N5-greetings')));
+  for (let i = 0; i < 12 && !a.document.querySelector('.result'); i++) {
+    a.click('.choice');
+    a.click('#next');
+  }
+  assert.ok(a.document.querySelector('.result'), '應該到結果頁');
+  assert.ok(a.document.querySelector('a[href="#/unit/N5-greetings"]'), '結果頁有回到單元');
+  assert.ok(Object.keys(a.ctx.Progress.load().items).every(id => ids.has(id)), '只記錄單元內的題目');
+
+  a.route('#/unit/N5-kana-rules');
+  assert.ok(a.document.querySelector('#mark-read'));
+  a.click('#mark-read');
+  assert.match(main().textContent, /已讀完/);
+  assert.equal(a.document.querySelector('#mark-read'), null);
 });
 
 test('儲存程度後首頁與每日練習一致；新內容先學再練', async () => {
