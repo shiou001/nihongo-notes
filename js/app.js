@@ -7,8 +7,11 @@
   const PLAN = () => window.NIHONGO_PLAN || [];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // 顯示 Notion 的 **粗體** 與 [連結](url)
-  const rich = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b class="hl">$1</b>').replace(/\[(.+?)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  const doodle = n => window.DOODLES.get(n);
+  const rich = s => esc(String(s ?? '').replace(/^[\s\p{Extended_Pictographic}\uFE0F\u200D]+/u, '')).replace(/\*\*(.+?)\*\*/g, '<b class="hl">$1</b>').replace(/\[(.+?)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const titleText = s => String(s || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').trim();
+  const icon = n => `<span class="ph-icon" data-icon="${n}" aria-hidden="true"></span>`;
+  const kindIcon = kind => icon(({ 假名: 'text-aa', 發音: 'speaker-high', 會話: 'notebook', 文法: 'pencil-simple', 單字: 'book-open', 閱讀: 'book-open', 漢字: 'translate' })[kind] || 'book-open');
+  const doodle = n => icon(({ onigiri: 'cards', cloud: 'chart-line', star: 'check-circle', torii: 'calendar-blank' })[n] || 'book-open');
   const fmtDate = iso => { try { return new Date(iso).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
 
   // ────────────────────────────── 首頁 ──────────────────────────────
@@ -18,11 +21,11 @@
   }
   function syncHint() {
     if (!window.Sync) return '';
-    if (!Sync.enabled()) return '<a href="#/sync">☁️ 跨裝置同步未設定</a>';
+    if (!Sync.enabled()) return '<a href="#/sync"> 跨裝置同步未設定</a>';
     const s = Sync.getStatus();
-    return s.state === 'nocode' ? '<a href="#/sync">☁️ 尚未連結同步碼，點此設定</a>'
-      : s.state === 'error' ? `<a href="#/sync">⚠️ 同步失敗：${esc(s.error)}</a>`
-      : `<a href="#/sync">☁️ 同步碼 ${esc(Sync.getCode())}</a>`;
+    return s.state === 'nocode' ? '<a href="#/sync"> 尚未連結同步碼，點此設定</a>'
+      : s.state === 'error' ? `<a href="#/sync"> 同步失敗：${esc(s.error)}</a>`
+      : `<a href="#/sync"> 同步碼 ${esc(Sync.getCode())}</a>`;
   }
   function currentLevel() {
     return PLAN().find(p => p.level === Study.profile().level) || PLAN()[0];
@@ -49,67 +52,43 @@
   function dueCount(now = Date.now()) {
     return Object.entries(Progress.load().items).filter(([id, s]) => !id.startsWith('u_') && s.seen && (!s.due || s.due <= now)).length;
   }
-  const STATUS_ICON = { done: '✅', active: '▶', todo: '○' };
+  const STATUS_ICON = { done: icon('check-circle'), active: icon('play'), todo: icon('circle') };
   function unitRow(u, cur) {
     const st = Curriculum.stats(u);
     const meta = u.readOnly ? (st.read ? '已讀' : '純閱讀') : `${st.learned}/${st.total} 已學`;
     return `<li class="${st.status} ${cur && cur.key === u.key ? 'current' : ''}"><a href="#/unit/${esc(u.key)}">
-      <span class="u-num">${u.index}</span><span class="u-kind tag">${esc(u.icon)} ${esc(u.kind)}</span>
+      <span class="u-num">${u.index}</span><span class="u-kind tag">${kindIcon(u.kind)} ${esc(u.kind)}</span>
       <span class="u-title">${esc(u.title)}${u.desc ? `<small>${esc(u.desc)}</small>` : ''}</span>
       <span class="u-meta">${meta}</span><span class="u-status" aria-label="${st.status}">${STATUS_ICON[st.status]}</span></a></li>`;
   }
 
   // ────────────────────────────── 今日 ──────────────────────────────
   function viewToday() {
-    const d = DATA(); const o = Quiz.overallStats(); const lv = currentLevel();
-    const profile = Study.profile();
-    const unit = Curriculum.current(profile.level);
-    const us = unit ? Curriculum.stats(unit) : null;
-    const sum = Curriculum.levelSummary(profile.level);
-    const list = unit ? Curriculum.all(profile.level) : [];
-    const upcoming = unit ? list.slice(unit.index, unit.index + 4) : [];
-    const daily = Quiz.buildQuestions(Study.dailyOptions());
-    const dueVocab = d.vocab.filter(v => v.level === profile.level && Progress.stat(v.id).seen && (!Progress.stat(v.id).due || Progress.stat(v.id).due <= Date.now())).length;
-    const due = dueCount();
-    return `
-    <section class="hero">
-      <div class="hero-mascot">${doodle('daruma')}</div>
-      <div>
-        <p class="kicker">${greeting()}！</p>
-        <h1>にほんごノート</h1>
-        <p class="lead">${unit ? `你在 ${profile.level} 第 ${unit.index} / ${unit.total} 單元：${esc(unit.title)}。` : `${profile.level} 還沒有課程內容。`}${due ? `另有 ${due} 題到期複習。` : '目前沒有到期的複習。'}</p>
-        <p>建議順序：先把到期的複習做完，再繼續單元。${daily.length ? `今日練習 ${daily.length} 題，約 ${Math.max(2, Math.ceil(daily.length * .6))} 分鐘。` : ''}</p>
-        <div class="actions">
-          ${unit ? `<a class="btn primary" href="#/unit/${esc(unit.key)}">▶ 繼續單元</a>` : ''}
-          <a class="btn ${unit ? '' : 'primary'}" href="#/quiz?mode=daily">🔁 ${daily.length ? `今日複習 ${daily.length} 題` : '查看今日複習'}</a>
-        </div>
-      </div>
+    const profile = Study.profile(), unit = Curriculum.current(profile.level);
+    const st = unit ? Curriculum.stats(unit) : null;
+    const upcoming = unit ? Curriculum.all(profile.level).slice(unit.index, unit.index + 3) : [];
+    const due = dueCount(), daily = Quiz.buildQuestions(Study.dailyOptions());
+    const count = due || daily.length;
+    const samples = unit ? (unit.kana.length ? unit.kana.slice(0, 5).map(k => ({ word: k.hira, reading: k.romaji })) : unit.auto === 'vocab' ? unit.items.vocab.slice(0, 3) : unit.kanji.length ? unit.kanji.slice(0, 5).map(k => ({ word: k.k })) : []) : [];
+    return `<section class="today-head"><h1>今日，留一點時間給<span>日文</span>。</h1><p>一點一點累積，日文會成為你生活中的一部分。</p></section>
+    <section class="review-banner" aria-labelledby="today-review">
+      <div class="review-symbol">${icon('cards-three')}</div>
+      <div class="review-copy"><h2 id="today-review">${due ? '今日複習' : '今日練習'}</h2><p class="review-count"><strong>${count}</strong><span>${due ? '題到期' : '題可練習'}${count ? `・${count > 20 ? '本輪 20 題，' : ''}約 ${Math.max(2, Math.ceil(Math.min(count, 20) * .6))} 分鐘` : ''}</span></p><p class="meta">${due ? '複習已學過的內容，加深記憶。' : count ? '目前沒有到期題目，從一點新內容開始。' : '今天的份量完成了，也可以繼續探索課程。'}</p></div>
+      <a class="btn primary" href="${count ? due ? '#/quiz?mode=due' : '#/quiz?mode=daily' : '#/course'}">${count ? due ? '開始複習' : '開始練習' : '探索課程'} ${icon('arrow-right')}</a>
     </section>
-
-    <details class="card profile" ${profile.configured ? '' : 'open'}><summary>${profile.configured ? `學習設定：${profile.level}・${profile.goal}・每週 ${profile.weekly} 個新單字` : '第一次使用：設定你的程度和目標'}</summary>${studyForm()}</details>
-
-    <section class="stats">
-      <div class="stat card tape"><div class="num">${dueVocab}</div><div class="lbl">${profile.level} 到期單字</div>${doodle('onigiri')}</div>
-      <div class="stat card tape"><div class="num">${sum.done}<small>/${sum.total}</small></div><div class="lbl">${profile.level} 單元完成</div>${doodle('torii')}</div>
-      <div class="stat card tape"><div class="num">${Progress.streakDays()}</div><div class="lbl">連續學習天</div>${doodle('star')}</div>
-      <div class="stat card tape"><div class="num">${o.weak}</div><div class="lbl">弱點待複習</div>${doodle('cloud')}</div>
-    </section>
-
-    <section class="grid2">
-      <div class="card">
-        <h2>🎯 目前單元</h2>
-        ${unit ? `<p><span class="tag">${esc(unit.icon)} ${esc(unit.kind)}</span> <b>${esc(unit.title)}</b></p><p class="meta">${esc(unit.desc)}</p>
-        <div class="bar"><div class="fill" style="width:${us.pct}%;background:${lv?.color || ''}"></div></div>
-        <p class="meta">${unit.readOnly ? (us.read ? '已讀完' : '讀完後按「我讀完了」') : `${us.learned} / ${us.total} 項已學・跨日熟練 ${us.mastered}・弱點 ${us.weak}`}</p>
-        <div class="actions"><a class="btn small primary" href="#/unit/${esc(unit.key)}">進入單元</a><a class="btn small" href="#/course/${profile.level}">看整個 ${profile.level} 課程</a></div>` : `<p class="meta">這一級目前沒有單元。到 <a href="#/course">課程</a> 看其他等級。</p>`}
+    ${unit ? `<section class="current-lesson">
+      <div class="lesson-preview"><p class="eyebrow">目前學習單元</p>
+        ${samples.length ? `<div class="lesson-samples ${unit.kana.length ? 'kana-samples' : ''}">${samples.map(x => `<div><span lang="ja">${esc(x.word)}</span><small>${esc(x.reading || '')}</small></div>`).join('')}</div>` : `<p class="lesson-title-preview" lang="ja">${esc(unit.title)}</p>`}
+        <p class="meta preview-caption">ここから。一步一步，打好基礎。</p>
       </div>
-      <div class="card">
-        <h2>📚 接下來</h2>
-        ${upcoming.length ? `<ol class="units compact">${upcoming.map(u => unitRow(u, null)).join('')}</ol>` : '<p class="meta">這一級的單元都完成了 🎉</p>'}
-      </div>
-    </section>
-
-    <p class="meta">教材來自作者的 Notion 筆記與公開字表，共 ${o.vocab} 個單字（筆記 ${o.notionVocab}・公開 ${o.externalVocab}）。教材同步：${fmtDate(d.syncedAt)} ・ ${syncHint()}</p>`;
+      <div class="lesson-info"><h2>${unit.title.startsWith(profile.level) ? '' : profile.level + ' '}${esc(unit.title)}</h2><div class="lesson-progress"><div class="bar" role="progressbar" aria-label="目前單元學習進度" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100"><div class="fill" style="width:${st.pct}%"></div></div><span class="meta">${unit.readOnly ? st.read ? '已讀完' : '尚未讀完' : `${st.learned} / ${st.total} 項已學`}</span></div><p class="meta lesson-desc">${esc(unit.desc)}</p><a class="text-link" href="#/unit/${esc(unit.key)}">繼續單元 ${icon('arrow-right')}</a></div>
+    </section>` : '<section class="card"><h2>這一級還沒有課程</h2><a href="#/course">探索其他等級</a></section>'}
+    <section class="upcoming"><div class="section-heading"><h2>接下來的學習內容</h2><a class="text-link" href="#/course/${profile.level}">查看全部課程 ${icon('arrow-right')}</a></div>
+      ${upcoming.length ? `<ol class="next-lessons">${upcoming.map(u => `<li><a href="#/unit/${esc(u.key)}">${icon('book-open')}<span class="next-title">${esc(u.title)}</span><span class="meta next-desc">${esc(u.desc)}</span>${icon('arrow-right')}</a></li>`).join('')}</ol>` : '<p class="meta">這一級已走到最後一個單元。繼續複習，讓學過的內容留下來。</p>'}
+    </section>`;
+  }
+  function viewSettings() {
+    return `<section class="page-head"><h1>設定</h1><p class="lead">照自己的步調，安排日文學習。</p></section><section class="card"><h2>學習偏好</h2>${studyForm()}<p id="settings-status" class="meta" role="status"></p></section><div class="ref-grid"><a class="card ref" href="#/voice"><h2>${icon('speaker-high')} 聲音</h2><p>調整日文朗讀的聲音與速度。</p></a><a class="card ref" href="#/sync"><h2>${icon('cloud')} 跨裝置同步</h2><p>把學習進度接到另一台裝置。</p></a></div>`;
   }
 
   // ────────────────────────────── 課程 ──────────────────────────────
@@ -120,7 +99,7 @@
     const s = Quiz.levelStats(level), ks = Quiz.kanjiStats(level);
     const tabs = Curriculum.LEVELS.map(l => { const z = Curriculum.levelSummary(l); return `<a class="btn small ${l === level ? 'primary' : ''}" href="#/course/${l}">${l} <small>${z.done}/${z.total}</small></a>`; }).join('');
     return `
-    <section class="page-head"><h1>📚 課程</h1>
+    <section class="page-head"><h1> 課程</h1>
       <p class="lead">每一級照順序排成單元：讀筆記、練題目、達標後往下走。單字課和漢字課會穿插在文法、會話之間。N3～N1 為部分筆記，仍在補充。</p>
       <div class="actions">${tabs}</div>
     </section>
@@ -129,7 +108,7 @@
         <div><h2>${level} <small>${esc(p.title || '')}</small></h2><p>${esc(p.goal || '')}</p>${p.partial ? '<span class="tag">部分筆記・持續補充</span>' : ''}</div></div>
       <div class="bar"><div class="fill" style="width:${sum.pct}%;background:${p.color || ''}"></div></div>
       <p class="meta">${sum.done} / ${sum.total} 單元完成・單字跨日熟練 ${s.mastered} / ${s.total}・漢字 ${ks.mastered} / ${ks.total}${cur ? `・目前在第 ${cur.index} 單元` : ''}</p>
-      ${cur ? `<div class="actions"><a class="btn small primary" href="#/unit/${esc(cur.key)}">▶ 繼續第 ${cur.index} 單元</a>${level !== Study.profile().level ? `<span class="meta">你的學習設定是 ${Study.profile().level}，可在首頁調整。</span>` : ''}</div>` : ''}
+      ${cur ? `<div class="actions"><a class="btn small primary" href="#/unit/${esc(cur.key)}">繼續第 ${cur.index} 單元</a>${level !== Study.profile().level ? `<span class="meta">你的學習設定是 ${Study.profile().level}，可在設定調整。</span>` : ''}</div>` : ''}
       ${masteryHelp()}
     </section>
     ${list.length ? `<ol class="units card">${list.map(u => unitRow(u, cur)).join('')}</ol>` : '<div class="card"><p>這一級還沒有課程內容。可以在 Notion 加筆記，或在 <code>data/curriculum.js</code> 加單元。</p></div>'}`;
@@ -138,9 +117,9 @@
   // ────────────────────────────── 單元 ──────────────────────────────
   function unitReadHtml(u) {
     if (u.auto === 'vocab') {
-      return `<article class="card unit-read"><h2>本課單字 <small>${u.items.vocab.length} 個</small></h2><p class="meta">先讀一遍，點 🔊 聽發音，再遮住意思回想。</p>
+      return `<article class="card unit-read"><h2>本課單字 <small>${u.items.vocab.length} 個</small></h2><p class="meta">先讀一遍，點發音按鈕聽發音，再遮住意思回想。</p>
         <div class="tablewrap"><table class="vocab-table"><thead><tr><th>單字</th><th>讀音</th><th>意思</th><th></th></tr></thead><tbody>
-        ${u.items.vocab.map(v => `<tr><td lang="ja">${esc(v.word)}</td><td lang="ja">${esc(v.reading)}</td><td>${esc(v.meaning)}${v.ai ? ' <span class="tag">AI 翻譯</span>' : ''}</td><td><button class="btn tiny" data-say="${esc(v.reading || v.word)}">🔊</button></td></tr>`).join('')}
+        ${u.items.vocab.map(v => `<tr><td lang="ja">${esc(v.word)}</td><td lang="ja">${esc(v.reading)}</td><td>${esc(v.meaning)}${v.ai ? ' <span class="tag">AI 翻譯</span>' : ''}</td><td><button class="btn tiny" data-say="${esc(v.reading || v.word)}"><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span></button></td></tr>`).join('')}
         </tbody></table></div></article>`;
     }
     if (u.auto === 'kanji') {
@@ -152,7 +131,7 @@
     const parts = u.read.flatMap(ref => Curriculum.sections(ref));
     if (!parts.length) return '<article class="card unit-read"><p class="meta">這個單元沒有對應的筆記段落。檢查 data/curriculum.js 的 read 設定。</p></article>';
     return parts.map(({ page, section, index }) => `<article class="card unit-read ${section.level === 3 ? 'sub' : ''}">
-      ${section.heading ? `<h${section.level === 3 ? 3 : 2}>${rich(section.heading)}</h${section.level === 3 ? 3 : 2}>` : ''}
+      ${section.heading ? `<h${section.level === 3 ? 3 : 2}>${rich(titleText(section.heading))}</h${section.level === 3 ? 3 : 2}>` : ''}
       ${section.blocks.map(renderBlock).join('')}
       <p class="meta"><a href="#/notes/${DATA().pages.indexOf(page)}?section=${index}">在筆記裡看這段</a></p></article>`).join('');
   }
@@ -164,23 +143,23 @@
     const lv = PLAN().find(x => x.level === u.level) || {};
     return `
     <section class="page-head">
-      <p class="meta"><a href="#/course/${u.level}">📚 ${u.level} 課程</a> › 第 ${u.index} / ${u.total} 單元</p>
-      <h1><span class="tag">${esc(u.icon)} ${esc(u.kind)}</span> ${esc(u.title)}</h1>
+      <p class="meta"><a href="#/course/${u.level}"> ${u.level} 課程</a> › 第 ${u.index} / ${u.total} 單元</p>
+      <h1><span class="tag">${kindIcon(u.kind)} ${esc(u.kind)}</span> ${esc(u.title)}</h1>
       ${u.desc ? `<p class="lead">${esc(u.desc)}</p>` : ''}
     </section>
     <section class="card tape">
       <div class="bar"><div class="fill" style="width:${st.pct}%;background:${lv.color || ''}"></div></div>
-      <p class="meta">${u.readOnly ? (st.read ? '✅ 已讀完' : '純閱讀單元，讀完按下面的「我讀完了」') : `${st.learned} / ${st.total} 項已學（最近一次答對）・跨日熟練 ${st.mastered}・弱點 ${st.weak}${st.done ? '・✅ 已達標' : '・80% 已學即達標'}`}</p>
+      <p class="meta">${u.readOnly ? (st.read ? ' 已讀完' : '純閱讀單元，讀完按下面的「我讀完了」') : `${st.learned} / ${st.total} 項已學（最近一次答對）・跨日熟練 ${st.mastered}・弱點 ${st.weak}${st.done ? '・ 已達標' : '・80% 已學即達標'}`}</p>
       <div class="actions">
-        ${u.readOnly ? (st.read ? '' : `<button class="btn primary" id="mark-read" data-unit="${esc(u.key)}">✅ 我讀完了</button>`) : `<a class="btn primary" href="#/quiz?unit=${esc(u.key)}">✏️ 練習這個單元 <small>${st.total} 項</small></a>${st.weak ? `<a class="btn" href="#/quiz?unit=${esc(u.key)}&weak=1">只練弱點 (${st.weak})</a>` : ''}`}
-        ${u.kana.length ? '<a class="btn" href="#/kana">🈁 聽五十音</a>' : ''}
+        ${u.readOnly ? (st.read ? '' : `<button class="btn primary" id="mark-read" data-unit="${esc(u.key)}"> 我讀完了</button>`) : `<a class="btn primary" href="#/quiz?unit=${esc(u.key)}"> 練習這個單元 <small>${st.total} 項</small></a>${st.weak ? `<a class="btn" href="#/quiz?unit=${esc(u.key)}&weak=1">只練弱點 (${st.weak})</a>` : ''}`}
+        ${u.kana.length ? '<a class="btn" href="#/kana"> 聽五十音</a>' : ''}
       </div>
     </section>
-    <h2 class="unit-h">📖 讀</h2>
+    <h2 class="unit-h"> 讀</h2>
     ${unitReadHtml(u)}
     <div class="actions unit-nav">
       ${prev ? `<a class="btn small" href="#/unit/${esc(prev.key)}">← 第 ${prev.index} 單元：${esc(prev.title)}</a>` : ''}
-      ${next ? `<a class="btn small" href="#/unit/${esc(next.key)}">第 ${next.index} 單元：${esc(next.title)} →</a>` : '<span class="meta">這是最後一個單元 🎌</span>'}
+      ${next ? `<a class="btn small" href="#/unit/${esc(next.key)}">第 ${next.index} 單元：${esc(next.title)} →</a>` : '<span class="meta">這是最後一個單元 </span>'}
     </div>`;
   }
 
@@ -191,7 +170,7 @@
     const daily = Quiz.buildQuestions(Study.dailyOptions());
     const rows = Curriculum.LEVELS.map(l => { const z = Curriculum.levelSummary(l), s = Quiz.levelStats(l), k = Quiz.kanjiStats(l); return `<tr><td><a href="#/course/${l}">${l}</a></td><td>${z.done} / ${z.total}</td><td>${s.mastered} / ${s.total}</td><td>${k.mastered} / ${k.total}</td></tr>`; }).join('');
     return `
-    <section class="page-head"><h1>🔁 複習</h1><p class="lead">到期的題目會在這裡等你。不管在哪個單元學的，到期就一起複習。</p></section>
+    <section class="page-head"><h1> 複習</h1><p class="lead">到期的題目會在這裡等你。不管在哪個單元學的，到期就一起複習。</p></section>
     <section class="stats">
       <div class="stat card tape"><div class="num">${due}</div><div class="lbl">到期待複習</div>${doodle('onigiri')}</div>
       <div class="stat card tape"><div class="num">${o.weak}</div><div class="lbl">弱點</div>${doodle('cloud')}</div>
@@ -200,17 +179,17 @@
     </section>
     <section class="card">
       <div class="actions">
-        <a class="btn primary" href="#/quiz?mode=daily">🔁 ${Study.profile().level} 今日複習${daily.length ? ` (${daily.length})` : ''}</a>
-        <a class="btn ${due ? '' : 'disabled'}" href="#/quiz?mode=due">📅 全部到期 (${due})</a>
-        <a class="btn ${o.weak ? '' : 'disabled'}" href="#/quiz?mode=weak">💪 只練弱點 (${o.weak})</a>
-        <a class="btn" href="#/quiz">🎛️ 自選範圍</a>
+        <a class="btn primary" href="#/quiz?mode=daily"> ${Study.profile().level} 今日複習${daily.length ? ` (${daily.length})` : ''}</a>
+        <a class="btn ${due ? '' : 'disabled'}" href="#/quiz?mode=due"> 全部到期 (${due})</a>
+        <a class="btn ${o.weak ? '' : 'disabled'}" href="#/quiz?mode=weak"> 只練弱點 (${o.weak})</a>
+        <a class="btn" href="#/quiz"> 自選範圍</a>
       </div>
       <p class="meta">今日複習：你設定的等級，先出到期的，再帶一點新單字。全部到期：所有等級、所有題型，只出到期的。</p>
       ${masteryHelp()}
     </section>
-    <section class="card"><h2>各級進度</h2><div class="tablewrap"><table><thead><tr><th>等級</th><th>單元完成</th><th>單字跨日熟練</th><th>漢字跨日熟練</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+    <section class="card"><h2>各級進度</h2><div class="tablewrap" tabindex="0" role="region" aria-label="學習表格，可左右捲動"><table><thead><tr><th>等級</th><th>單元完成</th><th>單字跨日熟練</th><th>漢字跨日熟練</th></tr></thead><tbody>${rows}</tbody></table></div></section>
     <section class="card">
-      <h2>🕰️ 最近練習</h2>
+      <h2> 最近練習</h2>
       ${recent.length ? `<ul class="sessions">${recent.map(s => `<li><span>${fmtDate(s.at)}</span><b>${s.score} / ${s.total}</b><span class="tag">${esc(s.mode)}</span></li>`).join('')}</ul>` : '<p class="meta">還沒有紀錄。</p>'}
     </section>`;
   }
@@ -219,22 +198,22 @@
   function viewReference() {
     const d = DATA(); const o = Quiz.overallStats();
     return `
-    <section class="page-head"><h1>📖 參考資料</h1><p class="lead">課程用到的原始資料都在這裡，隨時查。想有系統地學，從 <a href="#/course">課程</a> 開始。</p></section>
+    <section class="page-head"><h1> 參考資料</h1><p class="lead">課程用到的原始資料都在這裡，隨時查。想有系統地學，從 <a href="#/course">課程</a> 開始。</p></section>
     <div class="ref-grid">
-      <a class="card ref" href="#/notes/0"><h2>📓 筆記</h2><p>你的 Notion 筆記，${d.pages.length} 頁，可全文搜尋。</p></a>
-      <a class="card ref" href="#/kana"><h2>🈁 五十音</h2><p>平假名、片假名對照表，點一下會唸。</p></a>
-      <a class="card ref" href="#/kanji"><h2>🀄 漢字</h2><p>JLPT 漢字 ${(d.kanji || []).length} 字，讀音、繁體對照、用到它的單字。</p></a>
-      <a class="card ref" href="#/quiz"><h2>🎛️ 自選測驗</h2><p>自己挑題型、等級、來源，共 ${o.vocab} 個單字可練。</p></a>
-      <a class="card ref" href="#/voice"><h2>🔊 聲音</h2><p>換朗讀的聲音和語氣。</p></a>
-      <a class="card ref" href="#/sync"><h2>☁️ 跨裝置同步</h2><p>用同步碼把進度接到手機。</p></a>
+      <a class="card ref" href="#/notes/0"><h2>${icon('notebook')} 筆記</h2><p>你的 Notion 筆記，${d.pages.length} 頁，可全文搜尋。</p></a>
+      <a class="card ref" href="#/kana"><h2>${icon('text-aa')} 五十音</h2><p>平假名、片假名對照表，點一下會唸。</p></a>
+      <a class="card ref" href="#/kanji"><h2>${icon('translate')} 漢字</h2><p>JLPT 漢字 ${(d.kanji || []).length} 字，讀音、繁體對照、用到它的單字。</p></a>
+      <a class="card ref" href="#/quiz"><h2>${icon('sliders-horizontal')} 自選測驗</h2><p>自己挑題型、等級、來源，共 ${o.vocab} 個單字可練。</p></a>
+      <a class="card ref" href="#/voice"><h2><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span> 聲音</h2><p>換朗讀的聲音和語氣。</p></a>
+      <a class="card ref" href="#/sync"><h2>${icon('cloud')} 跨裝置同步</h2><p>用同步碼把進度接到手機。</p></a>
     </div>
-    <section class="card"><h2>筆記分頁</h2><ul class="pagelist">${d.pages.map((p, i) => `<li><a href="#/notes/${i}"><span class="ico">${esc(p.icon)}</span>${esc(p.title)}<span class="cnt">${p.sections.length} 段</span></a></li>`).join('')}</ul></section>`;
+    <section class="card"><h2>筆記分頁</h2><ul class="pagelist">${d.pages.map((p, i) => `<li><a href="#/notes/${i}"><span class="ico">${icon('notebook')}</span>${esc(titleText(p.title))}<span class="cnt">${p.sections.length} 段</span></a></li>`).join('')}</ul></section>`;
   }
 
   // ────────────────────────────── 筆記 ──────────────────────────────
   function renderBlock(b) {
     if (b.type === 'table') {
-      return `<div class="tablewrap"><table>${b.headers.length ? `<thead><tr>${b.headers.map(h => `<th>${rich(h)}</th>`).join('')}</tr></thead>` : ''}<tbody>${b.rows.map(r => `<tr>${r.map(c => `<td>${rich(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      return `<div class="tablewrap" tabindex="0" role="region" aria-label="學習表格，可左右捲動"><table>${b.headers.length ? `<thead><tr>${b.headers.map(h => `<th>${rich(h)}</th>`).join('')}</tr></thead>` : ''}<tbody>${b.rows.map(r => `<tr>${r.map(c => `<td>${rich(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
     }
     if (b.type === 'quote') return `<blockquote>${rich(b.text)}</blockquote>`;
     if (b.type === 'list') return `<ul>${b.items.map(i => `<li>${rich(i)}</li>`).join('')}</ul>`;
@@ -251,24 +230,24 @@
         const text = (s.heading + ' ' + JSON.stringify(s.blocks)).toLowerCase();
         if (text.includes(query)) hits.push({ p, pi, s });
       }));
-      body = hits.length ? hits.map(({ p, pi, s }) => `<article class="card"><p class="meta"><a href="#/notes/${pi}">${esc(p.icon)} ${esc(p.title)}</a></p><h2>${rich(s.heading)}</h2>${s.blocks.map(renderBlock).join('')}${sectionPractice(p, s)}</article>`).join('')
+      body = hits.length ? hits.map(({ p, pi, s }) => `<article class="card"><p class="meta"><a href="#/notes/${pi}">${icon('notebook')} ${esc(titleText(p.title))}</a></p><h2>${rich(titleText(s.heading))}</h2>${s.blocks.map(renderBlock).join('')}${sectionPractice(p, s)}</article>`).join('')
         : `<div class="card"><p>找不到「${esc(q)}」。</p></div>`;
     } else {
-      body = page.sections.map((s, i) => `<article id="lesson-${i}" class="card ${s.level === 3 ? 'sub' : ''}">${s.heading ? `<h${s.level === 3 ? 3 : 2}>${rich(s.heading)}</h${s.level === 3 ? 3 : 2}>` : ''}${s.blocks.map(renderBlock).join('')}${s.editorial ? `<p class="meta">校訂：${esc(s.editorial)}</p>` : ''}${sectionPractice(page, s)}</article>`).join('');
+      body = page.sections.map((s, i) => `<article id="lesson-${i}" class="card ${s.level === 3 ? 'sub' : ''}">${s.heading ? `<h${s.level === 3 ? 3 : 2}>${rich(titleText(s.heading))}</h${s.level === 3 ? 3 : 2}>` : ''}${s.blocks.map(renderBlock).join('')}${s.editorial ? `<p class="meta">校訂：${esc(s.editorial)}</p>` : ''}${sectionPractice(page, s)}</article>`).join('');
     }
     return `
-    <section class="page-head"><h1>📖 筆記</h1>
+    <section class="page-head"><h1> 筆記</h1>
       <form class="search" onsubmit="event.preventDefault();location.hash='#/notes/${idx}?q='+encodeURIComponent(this.q.value)">
-        <input name="q" aria-label="搜尋全部筆記" placeholder="搜尋全部筆記…" value="${esc(q)}"><button class="btn small" aria-label="搜尋筆記">🔍</button>
+        <input name="q" aria-label="搜尋全部筆記" placeholder="搜尋全部筆記…" value="${esc(q)}"><button class="btn small" aria-label="搜尋筆記">搜尋</button>
       </form>
     </section>
     <div class="notes">
-      <label class="mobile-chapters">目前章節<select id="note-chapter">${d.pages.map((p, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select></label>
+      <label class="mobile-chapters">目前章節<select id="note-chapter">${d.pages.map((p, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${esc(titleText(p.title))}</option>`).join('')}</select></label>
       <nav class="card sidebar">
-        <ul>${d.pages.map((p, i) => `<li class="${i === idx && !query ? 'active' : ''}"><a href="#/notes/${i}"><span class="ico">${esc(p.icon)}</span>${esc(p.title)}</a></li>`).join('')}</ul>
-        <p class="meta">📡 ${fmtDate(page.edited || d.syncedAt)}</p>
+        <ul>${d.pages.map((p, i) => `<li class="${i === idx && !query ? 'active' : ''}"><a href="#/notes/${i}"><span class="ico">${icon('notebook')}</span>${esc(titleText(p.title))}</a></li>`).join('')}</ul>
+        <p class="meta"> ${fmtDate(page.edited || d.syncedAt)}</p>
       </nav>
-      <div class="notes-body">${query ? '' : `<h2 class="note-title">${esc(page.icon)} ${esc(page.title)}</h2><div class="actions lesson-actions">${lessonActions(page)}</div>`}${body}</div>
+      <div class="notes-body">${query ? '' : `<h2 class="note-title">${icon('notebook')} ${esc(titleText(page.title))}</h2><div class="actions lesson-actions">${lessonActions(page)}</div>`}${body}</div>
     </div>`;
   }
   function sectionPractice(page, section) {
@@ -296,16 +275,16 @@
         <div class="kana-grid">${Object.entries(rows).map(([r, ks]) => `<div class="kana-row"><span class="rowname">${esc(r)}</span>${ks.map(cell).join('')}</div>`).join('')}</div>
       </section>`).join('');
     return `
-    <section class="page-head"><h1>🈁 五十音</h1>
+    <section class="page-head"><h1> 五十音</h1>
       <div class="actions">
         <a class="btn small ${mode === 'hira' ? 'primary' : ''}" href="#/kana/hira">平假名</a>
         <a class="btn small ${mode === 'kata' ? 'primary' : ''}" href="#/kana/kata">片假名</a>
-        <a class="btn small" href="#/quiz?types=kana">✏️ 假名測驗</a>
-        <span class="meta">點一下假名會唸給你聽 🔊 <a href="#/voice">換聲音</a></span>
+        <a class="btn small" href="#/quiz?types=kana"> 假名測驗</a>
+        <span class="meta">點一下假名會唸給你聽 <span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span> <a href="#/voice">換聲音</a></span>
       </div>
     </section>${html}`;
   }
-  // 朗讀交給 js/voice.js：自動挑最自然的聲音，並套用你在「🔊 聲音」頁選的聲音和語氣
+  // 朗讀交給 js/voice.js，套用聲音頁選擇的聲音和語氣。
   function speak(text) { if (window.Voice) Voice.speak(text); }
 
   // ────────────────────────────── 測驗 ──────────────────────────────
@@ -319,7 +298,7 @@
     const chip = (name, val, label, on) => `<label class="chip ${on ? 'on' : ''}"><input type="checkbox" name="${name}" value="${val}" ${on ? 'checked' : ''}>${label}</label>`;
     const o = Quiz.overallStats();
     return `
-    <section class="page-head"><h1>✏️ 複習測驗</h1><p class="lead">預設依你的 ${Study.profile().level} 程度。先出到期複習，再出新內容；輸入題需自行回想答案。</p><a class="btn small" href="#/quiz?mode=daily">依目前程度開始今日練習</a>${masteryHelp()}</section>
+    <section class="page-head"><h1> 複習測驗</h1><p class="lead">預設依你的 ${Study.profile().level} 程度。先出到期複習，再出新內容；輸入題需自行回想答案。</p><a class="btn small" href="#/quiz?mode=daily">依目前程度開始今日練習</a>${masteryHelp()}</section>
     <form id="quiz-setup" class="card">
       ${params.has('source') || params.has('page') ? `<p>限定範圍：${esc(params.get('source') || params.get('page'))}</p><input type="hidden" name="source" value="${esc(params.get('source') || '')}"><input type="hidden" name="page" value="${esc(params.get('page') || '')}">` : ''}
       <h3>題型</h3>
@@ -333,14 +312,14 @@
       }).join('')}</div>
       <p class="meta">至少選一個等級。N3～N1 為部分筆記。文法、會話與假名按所選單元出題，未做完整 JLPT 分級。</p>
       <h3>單字來源</h3>
-      <div class="chips">${chip('origins', 'notion', `📓 作者筆記 <small>${o.notionVocab}</small>`, origins.includes('notion'))}${chip('origins', 'external', `🌐 公開單字 <small>${o.externalVocab}</small>`, origins.includes('external'))}</div>
+      <div class="chips">${chip('origins', 'notion', ` 作者筆記 <small>${o.notionVocab}</small>`, origins.includes('notion'))}${chip('origins', 'external', ` 公開單字 <small>${o.externalVocab}</small>`, origins.includes('external'))}</div>
       <p class="meta">至少選一個來源。公開單字中文多為 AI 翻譯，未全部人工校訂。</p>
       <h3>題數</h3>
       <div class="chips">${[10, 20, 30].map(n => `<label class="chip ${n === 10 ? 'on' : ''}"><input type="radio" name="count" value="${n}" ${n === 10 ? 'checked' : ''}>${n} 題</label>`).join('')}</div>
       <label class="chip ${weak ? 'on' : ''}"><input type="checkbox" name="weak" ${weak ? 'checked' : ''}>只出弱點題（目前 ${o.weak} 個）</label>
-      <div class="actions"><button class="btn primary big">開始！いってきます 🏃</button></div>
+      <div class="actions"><button class="btn primary big">開始！いってきます </button></div>
       <p id="setup-error" role="alert"></p>
-      <p class="meta">🔊 覺得發音太像機器人？<a href="#/voice">換一個聲音</a></p>
+      <p class="meta"><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span> 覺得發音太像機器人？<a href="#/voice">換一個聲音</a></p>
     </form>`;
   }
 
@@ -363,7 +342,7 @@
       <div class="card question tape">
         <div class="prompt ${[...q.prompt].length === 1 ? 'single' : ''}" lang="ja">${q.promptHtml || esc(q.prompt)}</div>
         ${q.sub ? `<div class="sub">${esc(q.sub)}</div>` : ''}
-        ${q.type.startsWith('kanji') || q.input ? '' : `<button class="btn tiny say" data-say="${esc(q.item.reading || q.prompt)}" ${['vocab_word', 'kana'].includes(q.type) ? 'data-reveals="true"' : ''} aria-label="播放日文發音">🔊${['vocab_word', 'kana'].includes(q.type) ? '（提示）' : ''}</button>`}
+        ${q.type.startsWith('kanji') || q.input ? '' : `<button class="btn tiny say" data-say="${esc(q.item.reading || q.prompt)}" ${['vocab_word', 'kana'].includes(q.type) ? 'data-reveals="true"' : ''} aria-label="播放日文發音"><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span>${['vocab_word', 'kana'].includes(q.type) ? '（提示）' : ''}</button>`}
         ${q.hint ? `<div><button class="btn small" id="show-hint" aria-controls="question-hint" aria-expanded="false">需要提示</button><p id="question-hint" hidden></p></div>` : ''}
         ${q.usedHint ? '<p class="meta">這次已看過內容，計入練習，不增加跨日熟練次數。</p>' : ''}
       </div>
@@ -413,8 +392,8 @@
       it.word ? `<a href="https://jisho.org/search/${encodeURIComponent(it.word)}" target="_blank" rel="noopener">查辭典與用例</a>` : '',
       `下次到期：${fmtDate(stat.due)}・跨日獨立答對 ${stat.retained}/3 次`,
       it.source ? `<span class="meta">出處：${esc(it.source)}</span>` : ''].filter(Boolean).join('<br>');
-    $('#feedback').innerHTML = `<div class="card ${ok ? 'good' : 'bad'}">${ok ? window.DOODLES.checkmark : window.DOODLES.cross}<b>${ok ? (q.usedHint ? '練習答對，之後再獨立回想' : '獨立答對！') : '再看一次正確答案'}：${esc(q.answer)}</b><div class="extra">${extra}</div>
-      <button class="btn primary" id="next">${quiz.i + 1 < quiz.qs.length ? '下一題 →' : '看結果 🎉'}</button></div>`;
+    $('#feedback').innerHTML = `<div class="card ${ok ? 'good' : 'bad'}">${ok ? icon('check-circle') : icon('x')}<b>${ok ? (q.usedHint ? '練習答對，之後再獨立回想' : '獨立答對！') : '再看一次正確答案'}：${esc(q.answer)}</b><div class="extra">${extra}</div>
+      <button class="btn primary" id="next">${quiz.i + 1 < quiz.qs.length ? '下一題 →' : '看結果 '}</button></div>`;
     $('#next').focus();
   }
 
@@ -428,7 +407,7 @@
     const u = quiz.unitKey ? Curriculum.get(quiz.unitKey) : null;
     if (!u) return '<a class="btn primary" href="#/quiz">再來一次</a>';
     const st = Curriculum.stats(u), next = Curriculum.all(u.level)[u.index];
-    return `<a class="btn primary" href="#/unit/${esc(u.key)}">回到單元（${st.learned}/${st.total} 已學${st.done ? '・✅ 達標' : ''}）</a>
+    return `<a class="btn primary" href="#/unit/${esc(u.key)}">回到單元（${st.learned}/${st.total} 已學${st.done ? '・ 達標' : ''}）</a>
       <a class="btn" href="#/quiz?unit=${esc(u.key)}">再練一次</a>
       ${st.done && next ? `<a class="btn" href="#/unit/${esc(next.key)}">下一單元 →</a>` : ''}`;
   }
@@ -476,7 +455,7 @@
           ${k.trad.length ? `<p>繁體寫法：<b class="hl">${esc(k.trad.join('／'))}</b></p>` : '<p class="meta">和繁體寫法相同</p>'}
           <p class="meta">${esc(k.meanings.join(', '))}</p>
         </div>
-        <button class="btn tiny" data-say="${esc(k.k)}">🔊</button>
+        <button class="btn tiny" data-say="${esc(k.k)}"><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span></button>
       </div>
       <p><span class="tag">音讀</span> ${k.on.length ? esc(k.on.map(A.toKata).join('・')) : '—'}</p>
       <p><span class="tag">訓讀</span> ${(k.kunTop || k.kun).length ? (k.kunTop || k.kun).map(A.kunHtml).join('・') : '—'}</p>
@@ -497,7 +476,7 @@
     const words = (DATA().kanjiWords || []).filter(w => w.level === level).length;
     const cell = k => `<a class="kj ${Quiz.kanjiStatus(k)} ${cur === k ? 'on' : ''}" href="#/kanji/${level}/${encodeURIComponent(k.k)}" title="${esc(k.meanings.join(', '))}"><span class="big">${esc(k.k)}</span>${k.trad.length ? `<span class="trad">${esc(k.trad[0])}</span>` : ''}</a>`;
     return `
-    <section class="page-head"><h1>🀄 漢字</h1>
+    <section class="page-head"><h1> 漢字</h1>
       <p class="lead">字義你一看就懂，難的是讀音。這裡練音讀、訓讀，還有同一個字放進不同詞裡怎麼唸。</p>
       <div class="actions">${levels.map(l => `<a class="btn small ${l === level ? 'primary' : ''}" href="#/kanji/${l}">${l} <small>${K.filter(k => k.level === l).length}</small></a>`).join('')}</div>
     </section>
@@ -508,11 +487,11 @@
         <div class="bar"><div class="fill" style="width:${st.pct}%"></div></div>
         <p class="meta">跨日熟練 ${st.mastered} / ${st.total}：音讀、訓讀都須在到期後獨立答對 3 次，每次至少間隔 24 小時。字格右下的紅色小字是繁體寫法，只有和日本寫法不同才會出現。</p>
         <div class="actions">
-          <a class="btn small primary" href="#/quiz?types=kanji_on,kanji_kun&levels=${level}">✏️ 字的讀音</a>
-          ${words ? `<a class="btn small" href="#/quiz?types=kanji_word&levels=${level}">✏️ 詞裡的讀音 <small>${words}</small></a>` : '<span class="meta">這一級的字還沒出現在你的單字裡，暫時沒有「詞裡的讀音」題。</span>'}
+          <a class="btn small primary" href="#/quiz?types=kanji_on,kanji_kun&levels=${level}"> 字的讀音</a>
+          ${words ? `<a class="btn small" href="#/quiz?types=kanji_word&levels=${level}"> 詞裡的讀音 <small>${words}</small></a>` : '<span class="meta">這一級的字還沒出現在你的單字裡，暫時沒有「詞裡的讀音」題。</span>'}
         </div>
       </div>
-      <div class="card kanji-detail">${cur ? kanjiDetailHtml(cur) : '<p class="meta">👇 點下面任一個字，看讀音和用到它的單字。</p>'}</div>
+      <div class="card kanji-detail">${cur ? kanjiDetailHtml(cur) : '<p class="meta"> 點下面任一個字，看讀音和用到它的單字。</p>'}</div>
     </div>
     <section class="card"><div class="kj-grid">${list.map(cell).join('')}</div></section>`;
   }
@@ -530,7 +509,7 @@
       <p class="meta">名字裡有 Desktop、Haruka、Ayumi、Ichiro 的是 Windows 內建的舊聲音，最像機器人。</p>`;
   function viewVoice() {
     const V = window.Voice;
-    const head = '<section class="page-head"><h1>🔊 聲音</h1><p class="lead">挑一個你喜歡的聲音和語氣。設定只存在這台裝置，因為每台裝置能用的聲音不一樣。</p></section>';
+    const head = '<section class="page-head"><h1><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span> 聲音</h1><p class="lead">挑一個你喜歡的聲音和語氣。設定只存在這台裝置，因為每台裝置能用的聲音不一樣。</p></section>';
     if (!V || !V.supported()) return `${head}<div class="card"><p>這個瀏覽器不支援語音朗讀，換 Chrome、Edge 或 Safari 試試看。</p></div>`;
     const list = V.voices(), cur = V.current(), st = V.settings();
     if (!list.length) return `${head}<div class="card"><h2>還沒找到日文聲音</h2><p>聲音清單可能還在載入，等一下會自動出現。如果一直是空的，代表這台裝置沒有日文語音，唸出來會很怪或沒有聲音。</p>${VOICE_HELP}</div>`;
@@ -538,14 +517,14 @@
     <div class="card tape">
       <h2>語氣</h2>
       <div class="chips">${Object.entries(V.PRESETS).map(([k, p]) => `<button type="button" class="chip ${st.preset === k ? 'on' : ''}" data-voice-preset="${k}">${p.label}</button>`).join('')}</div>
-      <form id="voice-test" class="search"><input name="text" value="${esc(VOICE_SAMPLE)}" aria-label="試聽句子"><button class="btn small primary">▶ 試聽</button></form>
+      <form id="voice-test" class="search"><input name="text" value="${esc(VOICE_SAMPLE)}" aria-label="試聽句子"><button class="btn small primary">試聽</button></form>
       <p class="meta">目前：${esc(cur?.name || '—')}</p>
     </div>
     <div class="card">
       <h2>聲音 <small>這台裝置有 ${list.length} 個日文聲音</small></h2>
       <ul class="voice-list">${list.map((v, i) => `
         <li class="${cur && v.name === cur.name ? 'on' : ''}">
-          <button type="button" class="btn tiny" data-voice-try="${i}" aria-label="試聽 ${esc(v.name)}">▶</button>
+          <button type="button" class="btn tiny" data-voice-try="${i}" aria-label="試聽 ${esc(v.name)}">${icon('play')}</button>
           <span class="vname">${esc(v.name)}</span>
           ${V.isRecommended(v) ? '<span class="tag">⭐ 推薦</span>' : ''}${v.localService ? '' : '<span class="tag net">需要網路</span>'}
           ${cur && v.name === cur.name ? '<span class="tag in-use">使用中</span>' : `<button type="button" class="btn tiny" data-voice-use="${i}">用這個</button>`}
@@ -559,7 +538,7 @@
   function viewSync(msg = '') {
     if (!Sync.enabled()) {
       return `
-      <section class="page-head"><h1>☁️ 跨裝置同步</h1><p class="lead">把測驗進度存到雲端，換手機、換電腦都接得上。</p></section>
+      <section class="page-head"><h1> 跨裝置同步</h1><p class="lead">把測驗進度存到雲端，換手機、換電腦都接得上。</p></section>
       <div class="card"><h2>尚未設定</h2>
         <p>需要一個免費的 Supabase 專案。步驟：</p>
         <ol>
@@ -573,28 +552,28 @@
     const code = Sync.getCode(); const st = Sync.getStatus();
     const o = Quiz.overallStats();
     return `
-    <section class="page-head"><h1>☁️ 跨裝置同步</h1><p class="lead">一組同步碼 = 一份進度。在每台裝置貼上同一組碼，進度就會合併在一起。</p></section>
-    ${msg ? `<div class="card ${msg.startsWith('⚠️') ? 'bad' : 'good'}"><p>${esc(msg)}</p></div>` : ''}
+    <section class="page-head"><h1> 跨裝置同步</h1><p class="lead">一組同步碼 = 一份進度。在每台裝置貼上同一組碼，進度就會合併在一起。</p></section>
+    ${msg ? `<div class="card ${msg.startsWith('錯誤：') ? 'bad' : 'good'}"><p>${esc(msg)}</p></div>` : ''}
     ${code ? `
     <div class="card tape">
       <h2>這台裝置的同步碼</h2>
-      <div class="synccode"><code id="synccode-text">${esc(code)}</code><button class="btn small" id="copy-code">📋 複製</button></div>
+      <div class="synccode"><code id="synccode-text">${esc(code)}</code><button class="btn small" id="copy-code"> 複製</button></div>
       <p class="meta">狀態：${esc(st.state === 'ok' ? '已同步 ' + fmtDate(st.at) : st.state === 'error' ? '同步失敗：' + st.error : st.state === 'syncing' ? '同步中…' : '待同步')} ・ 本機已熟練 ${o.mastered}／弱點 ${o.weak}</p>
       <p>把這組碼抄到另一台裝置的同一個頁面，按「連結」，兩邊的進度就會合併。</p>
       <div class="actions">
-        <button class="btn small" id="sync-now">🔄 立即同步</button>
-        <button class="btn small" id="unlink">🔌 這台裝置斷開</button>
+        <button class="btn small" id="sync-now"> 立即同步</button>
+        <button class="btn small" id="unlink"> 這台裝置斷開</button>
       </div>
     </div>` : `
     <div class="card tape">
       <h2>還沒有同步碼</h2>
       <p>第一台裝置按「產生」，之後其他裝置用「連結」貼同一組碼。</p>
-      <div class="actions"><button class="btn primary" id="create-code">✨ 產生新的同步碼</button></div>
+      <div class="actions"><button class="btn primary" id="create-code"> 產生新的同步碼</button></div>
     </div>`}
     <div class="card">
       <h2>${code ? '改連結另一組碼' : '連結既有的同步碼'}</h2>
       <form id="link-form" class="search">
-        <input name="code" placeholder="例如 sakura-ab3d-k9m2-x4bd" autocomplete="off" spellcheck="false">
+        <input name="code" aria-label="同步碼" placeholder="例如 sakura-ab3d-k9m2-x4bd" autocomplete="off" spellcheck="false">
         <button class="btn small primary">連結</button>
       </form>
       <p class="meta">連結時會先下載雲端進度，跟這台裝置的合併後再上傳。同一題以看過次數多的為準，不會互相覆蓋掉。</p>
@@ -610,7 +589,7 @@
   }
   async function syncAction(fn, okMsg) {
     try { const r = await fn(); app().innerHTML = viewSync(typeof okMsg === 'function' ? okMsg(r) : okMsg); }
-    catch (e) { app().innerHTML = viewSync('⚠️ ' + e.message); }
+    catch (e) { app().innerHTML = viewSync('錯誤：' + e.message); }
   }
 
   // ────────────────────────────── 路由 ──────────────────────────────
@@ -621,7 +600,7 @@
     const seg = pathPart.split('/').filter(Boolean);
     const view = seg[0] || 'home';
     // 導覽列只有四項，其他頁面歸到對應的那一項
-    const navView = { home: 'home', course: 'course', map: 'course', unit: 'course', review: 'review', quiz: 'review', reference: 'reference', notes: 'reference', kana: 'reference', kanji: 'reference', voice: 'reference', sync: 'reference' }[view] || 'home';
+    const navView = { home: 'home', course: 'course', map: 'course', unit: 'course', review: 'review', quiz: 'review', reference: 'reference', notes: 'reference', kana: 'reference', kanji: 'reference', voice: 'settings', sync: 'sync', settings: 'settings' }[view] || 'home';
     document.body.classList.remove('nav-open');
     $('#nav-toggle')?.setAttribute('aria-expanded', 'false');
     quiz.qs = []; quiz.unitKey = '';
@@ -634,6 +613,7 @@
       case 'reference': app().innerHTML = viewReference(); break;
       case 'notes': app().innerHTML = viewNotes(seg[1], params.get('q') || ''); break;
       case 'kana': app().innerHTML = viewKana(seg[1] || 'hira'); break;
+      case 'settings': app().innerHTML = viewSettings(); break;
       case 'sync': app().innerHTML = viewSync(); break;
       case 'voice': app().innerHTML = viewVoice(); break;
       // 等級也要解碼：「其他」在網址裡會變成 %E5%85%B6%E4%BB%96
@@ -663,14 +643,14 @@
     if (e.target.id === 'study-profile') {
       e.preventDefault(); const f = new FormData(e.target);
       Study.set({ level: f.get('level'), goal: f.get('goal'), weekly: f.get('weekly') });
-      route(); return;
+      route(); if ($('#settings-status')) $('#settings-status').textContent = '已儲存學習設定。'; return;
     }
     if (e.target.id === 'recall-answer') { e.preventDefault(); return answer(new FormData(e.target).get('answer')); }
     if (e.target.id === 'voice-test') { e.preventDefault(); return speak(e.target.text.value); }
     if (e.target.id === 'link-form') {
       e.preventDefault();
       const code = e.target.code.value;
-      return syncAction(() => Sync.link(code), '✅ 已連結，進度合併完成。');
+      return syncAction(() => Sync.link(code), ' 已連結，進度合併完成。');
     }
     if (e.target.id !== 'quiz-setup') return;
     e.preventDefault();
@@ -693,10 +673,10 @@
     const c = e.target.closest('.choice'); if (c) return answer(+c.dataset.i);
     if (e.target.closest('#next')) return nextQuestion();
     const s = e.target.closest('[data-say]'); if (s) { if (s.dataset.reveals && quiz.qs[quiz.i] && !quiz.answered) { quiz.qs[quiz.i].usedHint = true; s.textContent = '已用語音提示'; } return speak(s.dataset.say); }
-    if (e.target.closest('#create-code')) return syncAction(() => Sync.createNew(), c => `✅ 已產生同步碼 ${c}，把它抄到其他裝置就能接上。`);
-    if (e.target.closest('#sync-now')) return syncAction(() => Sync.pull(), '✅ 同步完成。');
+    if (e.target.closest('#create-code')) return syncAction(() => Sync.createNew(), c => ` 已產生同步碼 ${c}，把它抄到其他裝置就能接上。`);
+    if (e.target.closest('#sync-now')) return syncAction(() => Sync.pull(), ' 同步完成。');
     if (e.target.closest('#unlink')) { if (confirm('這台裝置會停止同步（本機進度保留，雲端資料也還在）。確定？')) { Sync.unlink(); app().innerHTML = viewSync('已斷開。'); } return; }
-    if (e.target.closest('#copy-code')) { navigator.clipboard?.writeText($('#synccode-text').textContent).then(() => { $('#copy-code').textContent = '✅ 已複製'; }); return; }
+    if (e.target.closest('#copy-code')) { navigator.clipboard?.writeText($('#synccode-text').textContent).then(() => { $('#copy-code').textContent = ' 已複製'; }); return; }
     const vp = e.target.closest('[data-voice-preset]');
     if (vp) { Voice.set({ preset: vp.dataset.voicePreset }); const t = voiceText(); app().innerHTML = viewVoice(); return speak(t); }
     const vt = e.target.closest('[data-voice-try]');
@@ -718,7 +698,7 @@
   });
   window.addEventListener('hashchange', route);
   window.addEventListener('DOMContentLoaded', () => {
-    document.body.insertAdjacentHTML('beforeend', window.DOODLES.wobbleFilter);
+
     Sync.init();
     // 聲音清單是非同步載入的：在聲音頁的話，載好後重畫
     window.Voice?.onVoicesChanged(() => { if (location.hash.startsWith('#/voice')) app().innerHTML = viewVoice(); });

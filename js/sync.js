@@ -116,18 +116,18 @@ window.Sync = (() => {
   function renderPill() {
     const el = document.getElementById('sync-pill');
     if (!el) return;
-    if (status.state === 'off') { el.hidden = true; return; }
+    if (status.state === 'off') { el.hidden = false; el.innerHTML = '<span class="ph-icon" data-icon="cloud" aria-hidden="true"></span>同步未設定' ; return; }
     el.hidden = false;
     const t = status.at ? new Date(status.at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
     const map = {
-      nocode: ['☁️ 未連結', 'nocode'],
-      idle: ['☁️ 待同步', 'idle'],
-      syncing: ['☁️ 同步中…', 'syncing'],
-      ok: [`☁️ 已同步 ${t}`, 'ok'],
-      error: ['⚠️ 同步失敗', 'error'],
+      nocode: ['未連結同步', 'nocode'],
+      idle: [' 待同步', 'idle'],
+      syncing: [' 同步中…', 'syncing'],
+      ok: [` 已同步 ${t}`, 'ok'],
+      error: [' 同步失敗', 'error'],
     };
     const [label, cls] = map[status.state] || map.idle;
-    el.textContent = label; el.className = `sync-pill ${cls}`; el.title = status.error || '點一下管理跨裝置同步';
+    el.innerHTML = '<span class="ph-icon" data-icon="cloud" aria-hidden="true"></span>' + label; el.className = `sync-pill ${cls}${el.classList.contains('active') ? ' active' : ''}`; el.title = status.error || '點一下管理跨裝置同步';
   }
 
   function init() {

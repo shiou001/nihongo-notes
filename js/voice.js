@@ -11,9 +11,9 @@
   const KEY = 'nihongo.voice';
 
   const PRESETS = {
-    cute:    { label: '🍡 可愛',   rate: 0.95, pitch: 1.25 },
-    natural: { label: '🌸 自然',   rate: 1.0,  pitch: 1.0 },
-    slow:    { label: '🐢 慢慢說', rate: 0.75, pitch: 1.1 },
+    cute:    { label: '可愛',   rate: 0.95, pitch: 1.25 },
+    natural: { label: '自然',   rate: 1.0,  pitch: 1.0 },
+    slow:    { label: '慢慢說', rate: 0.75, pitch: 1.1 },
   };
 
   // 分數越高越自然：神經網路語音 > Google／加強版 > 一般 > Windows 舊聲音；女聲略優先（比較符合「可愛」）

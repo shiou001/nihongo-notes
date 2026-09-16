@@ -25,7 +25,7 @@ async function app(hash = '#/') {
     Voice: { onVoicesChanged() {}, speak() {}, voices: () => [], get: () => ({}) },
   });
   ctx.window = ctx;
-  const scripts = ['data/content.js', 'data/external.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/doodles.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/app.js'];
+  const scripts = ['data/content.js', 'data/external.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/app.js'];
   for (const f of scripts) vm.runInContext(await readFile(new URL(f, root), 'utf8'), ctx, { filename: f });
   events.DOMContentLoaded();
   return { ctx, document,
@@ -37,8 +37,8 @@ async function app(hash = '#/') {
 
 test('今日、課程、單元、複習、參考資料、筆記、測驗設定可渲染；沒有失效的計畫欄位', async () => {
   const a = await app();
-  assert.match(a.document.querySelector('main').textContent, /到期單字/);
-  assert.match(a.document.querySelector('main').textContent, /第 1 \/ \d+ 單元/);
+  assert.match(a.document.querySelector('main').textContent, /今日練習/);
+  assert.match(a.document.querySelector('main').textContent, /目前學習單元/);
   for (const hash of ['#/map', '#/course/N4', '#/unit/N5-particles', '#/unit/N5-vocab-1', '#/unit/N5-kanji-1', '#/review', '#/reference', '#/notes/3', '#/quiz', '#/kana', '#/kanji/N5']) {
     a.route(hash);
     assert.ok(a.document.querySelector('main').textContent.length > 100, hash);
@@ -47,7 +47,7 @@ test('今日、課程、單元、複習、參考資料、筆記、測驗設定�
   a.route('#/map');
   assert.match(a.document.querySelector('main').textContent, /部分筆記/);
   assert.ok(!a.document.querySelector('main').textContent.includes('data/plan.js'));
-  assert.equal(a.document.querySelector('nav.top a.active').textContent.trim(), '📚 課程');
+  assert.equal(a.document.querySelector('nav.top a.active').textContent.trim(), '課程');
   assert.ok(a.document.querySelectorAll('.units li').length > 20);
   assert.equal(a.document.querySelector('.units li.current .u-num').textContent, '1');
 });
@@ -77,9 +77,11 @@ test('單元頁：讀筆記段落、練習只出單元題、達標後結果頁�
 });
 
 test('儲存程度後首頁與每日練習一致；新內容先學再練', async () => {
-  const a = await app();
+  const a = await app('#/settings');
   a.submit('#study-profile', [['level', 'N4'], ['weekly', '15'], ['goal', '考試複習']]);
-  assert.match(a.document.querySelector('.lead').textContent, /N4/);
+  assert.match(a.document.querySelector('#settings-status').textContent, /已儲存/);
+  a.route('#/');
+  assert.match(a.document.querySelector('.lesson-info').textContent, /N4/);
   a.route('#/quiz?mode=daily');
   assert.match(a.document.querySelector('main').textContent, /N4 新內容/);
   a.click('#learned-next');

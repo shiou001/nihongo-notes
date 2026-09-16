@@ -1,0 +1,25 @@
+/* Phosphor Icons 2.1.1, MIT. Original SVG assets in ./icons/. */
+.ph-icon{display:inline-block;width:1.35em;height:1.35em;flex-shrink:0;vertical-align:-.25em;background-color:currentColor;mask:var(--ph) center/contain no-repeat;-webkit-mask:var(--ph) center/contain no-repeat;}
+[data-icon="house"]{--ph:url("icons/house.svg")}
+[data-icon="book-open"]{--ph:url("icons/book-open.svg")}
+[data-icon="notebook"]{--ph:url("icons/notebook.svg")}
+[data-icon="bookmark-simple"]{--ph:url("icons/bookmark-simple.svg")}
+[data-icon="gear-six"]{--ph:url("icons/gear-six.svg")}
+[data-icon="cloud"]{--ph:url("icons/cloud.svg")}
+[data-icon="cards"]{--ph:url("icons/cards.svg")}
+[data-icon="arrow-right"]{--ph:url("icons/arrow-right.svg")}
+[data-icon="arrow-left"]{--ph:url("icons/arrow-left.svg")}
+[data-icon="list"]{--ph:url("icons/list.svg")}
+[data-icon="check-circle"]{--ph:url("icons/check-circle.svg")}
+[data-icon="circle"]{--ph:url("icons/circle.svg")}
+[data-icon="play"]{--ph:url("icons/play.svg")}
+[data-icon="speaker-high"]{--ph:url("icons/speaker-high.svg")}
+[data-icon="warning-circle"]{--ph:url("icons/warning-circle.svg")}
+[data-icon="x"]{--ph:url("icons/x.svg")}
+[data-icon="pencil-simple"]{--ph:url("icons/pencil-simple.svg")}
+[data-icon="text-aa"]{--ph:url("icons/text-aa.svg")}
+[data-icon="translate"]{--ph:url("icons/translate.svg")}
+[data-icon="sliders-horizontal"]{--ph:url("icons/sliders-horizontal.svg")}
+[data-icon="calendar-blank"]{--ph:url("icons/calendar-blank.svg")}
+[data-icon="chart-line"]{--ph:url("icons/chart-line.svg")}
+[data-icon="cards-three"]{--ph:url("icons/cards-three.svg")}
