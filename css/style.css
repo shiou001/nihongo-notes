@@ -216,6 +216,8 @@ article ul { padding-left: 1.3rem; }
 @keyframes pop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (max-width: 560px) { .feedback .card { grid-template-columns: 48px 1fr; } .feedback .btn { grid-column: 1 / -1; justify-content: center; } }
 .question .prompt.single { font-size: 5rem; }
+/* 例句填空的空格：一條連續底線，代表一個答案 */
+.cloze-blank { display: inline-block; width: 1.8em; border-bottom: .08em solid var(--ink); margin: 0 .12em; }
 .kw-target { color: var(--red); background: linear-gradient(transparent 60%, var(--yellow) 60%); font-weight: 600; }
 .bar.thin { height: 8px; margin-top: .2rem; }
 

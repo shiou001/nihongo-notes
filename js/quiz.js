@@ -15,13 +15,25 @@ window.Quiz = (() => {
     return s.seen > 0 && (s.wrong >= s.correct || s.streak === 0);
   }
 
+  const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // 例句填空：一題只挖一個空格。
+  // 答案在例句裡出現兩次以上的句子不出題：挖一個會把答案留在畫面上，挖兩個又會讓人以為要填兩個。
+  const clozeCount = g => (g.example ? g.example.split(g.pattern).length - 1 : 0);
+  const clozeParts = g => { const i = g.example.indexOf(g.pattern); return [g.example.slice(0, i), g.example.slice(i + g.pattern.length)]; };
+  const clozeText = g => clozeParts(g).join('＿');
+  const clozeHtml = g => { const [a, b] = clozeParts(g); return `${escHtml(a)}<span class="cloze-blank" aria-label="一個空格"></span>${escHtml(b)}`; };
+
   const TYPES = {
     vocab_meaning: { label: '單字 → 意思', pool: 'vocab', prompt: v => v.word, sub: v => v.reading !== v.word ? v.reading : '', answer: v => v.meaning, kind: 'meaning' },
     vocab_reading: { label: '讀音 → 單字', pool: 'vocab', prompt: v => v.reading, sub: () => '', hint: v => v.meaning, answer: v => v.word, kind: 'word', filter: v => v.reading && v.reading !== v.word },
     vocab_recall: { label: '輸入假名讀音', pool: 'vocab', prompt: v => v.word, sub: () => '', hint: v => v.meaning, answer: v => v.reading, kind: 'reading', input: true, filter: v => /^[\u3041-\u3096ー]+$/.test(v.reading) && v.reading !== v.word },
     vocab_word:    { label: '意思 → 單字', pool: 'vocab', prompt: v => v.meaning, sub: () => '', answer: v => v.word, kind: 'word' },
     grammar:       { label: '文法／疑問詞 → 意思', pool: 'grammar', prompt: g => g.pattern, sub: () => '', answer: g => g.meaning, kind: 'meaning' },
-    grammar_cloze: { label: '例句填空', pool: 'grammar', input: true, filter: g => g.example && g.example.includes(g.pattern) && !/[〜～（(]/.test(g.pattern) && !g.example.startsWith('原形：'), prompt: g => g.example.split(g.pattern).join('＿＿'), sub: () => '', hint: g => g.meaning, answer: g => g.pattern, kind: 'word' },
+    grammar_cloze: { label: '例句填空', pool: 'grammar', input: true,
+                     filter: g => g.example && clozeCount(g) === 1 && !/[〜～（(]/.test(g.pattern) && !g.example.startsWith('原形：'),
+                     prompt: g => clozeText(g), promptHtml: g => clozeHtml(g), sub: () => '空格只有一個答案',
+                     hint: g => g.meaning, answer: g => g.pattern, kind: 'word' },
     phrase:        { label: '會話 → 中文', pool: 'phrases', prompt: p => p.jp, sub: p => p.romaji || '', answer: p => p.zh, kind: 'meaning' },
     kana:          { label: '假名 → 羅馬拼音', pool: 'kana', prompt: k => k.hira, sub: k => k.kata, answer: k => k.romaji, kind: 'romaji' },
     // 漢字：id 加上 :on / :kun，讓同一個字的音讀和訓讀分開記進度

@@ -89,9 +89,22 @@ test('讀音題不直接帶中文答案，填空不顯示待填字，輸入接�
   assert.ok(qs.every(q => q.sub === '' && q.prompt !== q.answer));
   const fill = Q.buildQuestions({ types: ['grammar_cloze'], count: 50 });
   assert.ok(fill.length > 0);
-  assert.ok(fill.every(q => q.input && q.prompt.includes('＿＿') && !q.prompt.includes(q.answer)));
+  assert.ok(fill.every(q => q.input && [...q.prompt].filter(ch => ch === '＿').length === 1 && !q.prompt.includes(q.answer)));
   assert.equal(Q.checkAnswer({ answer: 'がくせい' }, ' ガクセイ '), true);
   assert.equal(Q.checkAnswer({ answer: 'きょう' }, 'きよう'), false);
+});
+
+test('填空只挑答案出現一次的例句，而且只有一個空格', async () => {
+  const c = await engine(), Q = c.Quiz;
+  c.NIHONGO_DATA.grammar = [
+    { id: 'g_once', pattern: 'の', meaning: '所屬、修飾', example: '私の本', source: '文法筆記 › 助詞' },
+    { id: 'g_twice', pattern: 'は', meaning: '主題標記', example: '私は学生です。彼は先生です。', source: '文法筆記 › 助詞' },
+  ];
+  const qs = Q.buildQuestions({ types: ['grammar_cloze'], count: 20 });
+  assert.equal(qs.length, 1);                                // 出現兩次的例句不出題
+  assert.equal(qs[0].id, 'g_once');
+  assert.equal(qs[0].prompt, '私＿本');                      // 一個空格，不是兩個底線
+  assert.ok(qs[0].promptHtml.includes('cloze-blank') && !qs[0].promptHtml.includes('の'));
 });
 
 test('單元與頁面篩選確實限制題庫，小題庫使用輸入題而非唯一選項', async () => {
