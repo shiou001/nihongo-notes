@@ -43,7 +43,8 @@ window.Quiz = (() => {
     kanji_kun:     { label: '漢字 → 訓讀', pool: 'kanji', filter: k => k.kun.length > 0, id: k => k.id + ':kun',
                      prompt: k => k.k, sub: k => [tradNote(k), '訓讀是？'].filter(Boolean).join('　'), answer: k => kunText(k), kind: 'reading',
                      distractors: k => similarKanji(k, 'kun'), conflict: (a, b) => overlap(kunStems(a), kunStems(b)), detail: k => kanjiDetail(k) },
-    kanji_word:    { label: '詞裡的讀音', pool: 'kanjiWords', prompt: w => w.word, promptHtml: w => KA().highlightHtml(w),
+    kanji_word:    { label: '詞裡的讀音', pool: 'kanjiWords', filter: w => [...String(w.word || '')].length > 1,
+                     prompt: w => w.word, promptHtml: w => KA().highlightHtml(w),
                      sub: w => `「${w.ch}」在這個詞裡怎麼唸？`, answer: w => w.seg, kind: 'reading',
                      distractors: w => otherReadings(w), conflict: (a, b) => a.ch === b.ch, detail: w => `${w.word}＝${w.meaning}` },
   };

@@ -106,6 +106,20 @@ test('prepare：產生詞裡的讀音題、特殊讀法、訓讀排序', () => {
   assert.equal(new Set(D.kanjiWords.map(w => w.id)).size, D.kanjiWords.length);
 });
 
+test('prepare：單一漢字沒有語境，不產生詞裡的讀音題', () => {
+  const D = { vocab: [
+    { word: '中', reading: 'なか', meaning: '裡面', level: 'N5' },
+    { word: '中国', reading: 'ちゅうごく', meaning: '中國', level: 'N5' },
+  ] };
+  const kanji = [
+    { id: 'kj_中', k: '中', trad: [], level: 'N5', on: ['ちゅう'], kun: [['なか']], meanings: [] },
+    { id: 'kj_国', k: '国', trad: ['國'], level: 'N5', on: ['こく'], kun: [['くに']], meanings: [] },
+  ];
+  A.prepare(D, { kanji });
+  assert.deepEqual(D.kanjiWords.map(w => `${w.word}:${w.ch}=${w.seg}`), ['中国:中=ちゅう', '中国:国=ごく']);
+  assert.ok(D.kanjiUses.get('中').some(w => w.word === '中'), '漢字頁的實際用例仍保留單漢字詞');
+});
+
 test('實際資料：各級字數、繁體對照、沒有 WaniKani 內容', async () => {
   const t = await readFile(new URL('../data/kanji.js', import.meta.url), 'utf8');
   const data = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));
