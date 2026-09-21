@@ -149,6 +149,21 @@ test('所有生成選擇題答案唯一且至少有兩個選項', async () => {
   }
 });
 
+test('詞裡的讀音：舊資料含單一漢字時仍不出歧義題', async () => {
+  const c = await engine();
+  c.KanjiAlign = { highlightHtml: w => w.word, toHira: r => r };
+  c.NIHONGO_DATA.kanji = [
+    { id: 'kj_中', k: '中', level: 'N5', on: ['ちゅう'], kun: [['なか']], trad: [], meanings: [] },
+  ];
+  c.NIHONGO_DATA.kanjiUses = new Map([['中', []]]);
+  c.NIHONGO_DATA.kanjiWords = [
+    { id: 'kw_single', word: '中', reading: 'なか', meaning: '裡面', ch: '中', seg: 'なか', level: 'N5', parts: [] },
+    { id: 'kw_context', word: '中国', reading: 'ちゅうごく', meaning: '中國', ch: '中', seg: 'ちゅう', level: 'N5', parts: [] },
+  ];
+  const qs = c.Quiz.buildQuestions({ types: ['kanji_word'], levels: ['N5'], count: 10 });
+  assert.equal(qs.map(q => q.prompt).join(','), '中国');
+});
+
 test('學習設定可重讀且錯誤設定退回預設；週數與80%目標一致', async () => {
   const { Study: S } = await engine();
   S.set({ level: 'N3', goal: '日常會話', weekly: '30' });

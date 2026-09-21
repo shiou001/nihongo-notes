@@ -98,6 +98,10 @@
     const lookup = c => byChar.get(c);
     const words = [], uses = new Map(), special = new Map(), seen = new Set();
     for (const v of D.vocab || []) {
+      const surface = clean(v.word, v.reading).w;
+      // 「詞裡の読み」には文脈が必要。単漢字（中、上、生…）だけを表示すると
+      // なか／ちゅう／じゅう等の複数の読みが成立し、一意に答えられない。
+      const hasReadingContext = [...surface].length > 1;
       const parts = align(v.word, v.reading, lookup);
       if (!parts) {
         const chars = new Set([...clean(v.word, v.reading).w].filter(c => isKanji(c) && c !== '々' && byChar.has(c)));
@@ -115,7 +119,7 @@
           word: v.word, reading: v.reading, meaning: v.meaning,
           level: e.level, wordLevel: v.level, origin: v.origin || 'notion',
         };
-        words.push(item);
+        if (hasReadingContext) words.push(item);
         push(uses, p.ch, item);
       });
     }
