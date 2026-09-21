@@ -50,7 +50,13 @@
   }
   // 全站到期的題目數（不含單元的「已讀」標記）
   function dueCount(now = Date.now()) {
-    return Object.entries(Progress.load().items).filter(([id, s]) => !id.startsWith('u_') && s.seen && (!s.due || s.due <= now)).length;
+    const d = DATA();
+    const active = new Set([...d.vocab, ...d.grammar, ...d.phrases, ...d.kana, ...(d.kanjiWords || [])].map(x => x.id));
+    for (const k of d.kanji || []) {
+      if (k.on?.length) active.add(k.id + ':on');
+      if (k.kun?.length) active.add(k.id + ':kun');
+    }
+    return Object.entries(Progress.load().items).filter(([id, s]) => active.has(id) && s.seen && (!s.due || s.due <= now)).length;
   }
   const STATUS_ICON = { done: icon('check-circle'), active: icon('play'), todo: icon('circle') };
   function unitRow(u, cur) {

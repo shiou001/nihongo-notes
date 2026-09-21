@@ -150,3 +150,10 @@ test('選單可切換且可及性屬性一致，原生選取控制項仍保留',
   const css = await readFile(new URL('css/style.css', root), 'utf8');
   assert.ok(!/\.chip input\s*\{[^}]*display:\s*none/.test(css));
 });
+
+test('已從題庫移除的舊題紀錄不會增加到期數', async () => {
+  const a = await app('#/review');
+  a.ctx.Progress.record('kw_removed_ambiguous_single_kanji', false, { now: Date.now() - 20 * 60 * 1000 });
+  a.route('#/review');
+  assert.equal(a.document.querySelector('.stats .stat .num').textContent, '0');
+});
