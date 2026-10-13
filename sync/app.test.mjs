@@ -43,7 +43,9 @@ test('今日、課程、單元、複習、參考資料、筆記、測驗設定�
   assert.ok(a.document.querySelector('.home-hero .hero-title'));
   assert.equal(a.document.querySelectorAll('.home-sec .sec-no').length, 4);
   assert.ok(a.document.querySelector('.marquee[aria-hidden="true"]'));
-  assert.ok(a.document.querySelector('.home-hero .hero-cover img[src*="cover-cat"]'), '封面圖');
+  assert.ok(a.document.querySelectorAll('.home-hero .hero-cats img.cat').length === 3, '標題卡上的三隻貓');
+  assert.match(a.document.querySelector('.hero-card .hero-title').textContent, /にほんご.*ノート/);
+  assert.equal(a.document.querySelectorAll('.lesson-progress .paw').length, 10, '貓腳印進度');
   assert.equal(a.document.querySelector('.home-hero .hero-greet, .home-hero .hero-lead, canvas'), null, '問候語、標語、櫻花都拿掉了');
   assert.ok(a.document.querySelector('.review-chars img.cat[src*="img/cats/"]'), '貓咪角色');
   assert.match(a.document.querySelector('.hero-badge .ring').getAttribute('aria-label'), /N5 達成率 [0-9]+%/);
@@ -175,8 +177,11 @@ test('生活日本：總覽、主題單元的對話、文化小問答、今日�
   a.route('#/life');
   assert.equal(a.document.querySelector('nav.top a.active').textContent.trim(), '生活日本');
   assert.equal(main().querySelectorAll('.life-card').length, a.ctx.NIHONGO_LIFE.topics.length);
+  assert.equal(main().querySelectorAll('.life-group').length, Object.keys(a.ctx.NIHONGO_LIFE.themes).length, '依主題分組');
+  assert.equal(main().querySelectorAll('.life-card .bar').length, 0, '還沒開始的主題不顯示進度條');
   a.route('#/life/' + encodeURIComponent('食物'));
-  assert.ok(main().querySelectorAll('.life-card').length >= 2 && [...main().querySelectorAll('.life-card .tag')].some(t => t.textContent === '食物'));
+  assert.ok(main().querySelectorAll('.life-card').length >= 2 && [...main().querySelectorAll('.life-card .life-meta')].every(m => m.textContent.startsWith('食物・')));
+  assert.equal(main().querySelectorAll('.life-group').length, 1, '篩選後只有一組');
 
   a.route('#/unit/N5-life-ramen');
   assert.ok(!main().innerHTML.includes('undefined'));

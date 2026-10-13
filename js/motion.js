@@ -24,7 +24,7 @@ window.Motion = (() => {
     el.className = 'intro';
     el.setAttribute('aria-hidden', 'true');
     el.innerHTML = `<div class="intro-inner">
-        <svg class="intro-enso" viewBox="0 0 200 200"><path d="M100 22 C 150 20 182 58 178 104 C 174 152 132 180 92 176 C 48 172 20 136 24 94 C 28 60 56 30 96 26"/></svg>
+        <img class="intro-cat" src="img/cats/walk.webp?v=1" alt="">
         <p class="intro-word" lang="ja">${[...'にほんご'].map((c, i) => `<span style="--i:${i}">${c}</span>`).join('')}</p>
         <p class="intro-en">Nihongo Note</p>
       </div>`;

@@ -20,7 +20,7 @@
   const CHAR_OF = { onigiri: 'kuro', daruma: 'chatora', maneki: 'maneki', torii: 'walk', fuji: 'mike', cloud: 'uruuru', star: 'maneki' };
   const doodle = n => window.Art ? Art.char(CHAR_OF[n] || 'kuro') : icon(({ onigiri: 'cards', cloud: 'chart-line', star: 'check-circle', torii: 'calendar-blank' })[n] || 'book-open');
   // 首頁的編號區段標題：(01) 大大的英文 ＋ 中文
-  const secHead = (no, en, zh, id = '', link = '') => `<header class="sec-head"><p class="sec-no">(${no})</p><h2${id ? ` id="${id}"` : ''}><span class="sec-en" aria-hidden="true">${en}</span><span class="sec-zh">${zh}</span></h2>${link}</header>`;
+  const secHead = (no, en, zh, id = '', link = '') => `<header class="sec-head"><p class="sec-no">${no}</p><h2${id ? ` id="${id}"` : ''}><span class="sec-en" aria-hidden="true">${en}</span><span class="sec-zh">${zh}</span></h2>${link}</header>`;
   const MARQUEE = [['にほんご', 'Nihongo'], ['ことば', 'Kotoba'], ['ひらがな', 'Hiragana'], ['かんじ', 'Kanji'], ['かいわ', 'Kaiwa'], ['たべもの', 'Tabemono'], ['たび', 'Tabi'], ['きせつ', 'Kisetsu']];
   const marquee = () => { const row = MARQUEE.map(([ja, en]) => `<span lang="ja">${ja}</span><em>${en}</em><i></i>`).join(''); return `<div class="marquee" aria-hidden="true"><div class="marquee-track">${row}${row}</div></div>`; };
   const fmtDate = iso => { try { return new Date(iso).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
@@ -92,12 +92,14 @@
     const reviewHref = count ? due ? '#/quiz?mode=due' : '#/quiz?mode=daily' : '#/course';
     return `
     <section class="home-hero" aria-label="今日">
-      <div class="hero-top"><p class="hero-date">${date}</p><h1 class="hero-title"><span class="sr-only">にほんごノート </span>Nihongo Note</h1></div>
-      <figure class="hero-cover">
-        <img src="img/cover-cat.webp?v=1" alt="在書架前看書的貓" width="1240" height="649" fetchpriority="high">
+      ${A ? `<div class="hero-cats" aria-hidden="true">${A.char('chatora')}${A.char('kuro')}${A.char('mike')}</div>` : ''}
+      <div class="hero-card">
+        <p class="hero-date">${date}</p>
+        <h1 class="hero-title">にほんご<span class="note-word">ノート</span></h1>
+        ${unit ? `<p class="hero-level">${profile.level}　第 ${unit.index} / ${unit.total} 單元</p>` : ''}
+        <div class="hero-cta"><a class="btn primary" href="${unit ? '#/unit/' + esc(unit.key) : '#/course'}">繼續單元 ${icon('arrow-right')}</a><a class="btn" href="${reviewHref}">${due ? '今日複習' : '今日練習'}</a></div>
         ${A ? `<a class="hero-badge" href="#/course/${profile.level}">${A.ring(sum.pct, `${profile.level} 達成率`, `${sum.done} / ${sum.total} 單元`)}</a>` : ''}
-      </figure>
-      <div class="hero-cta"><a class="btn primary" href="${unit ? '#/unit/' + esc(unit.key) : '#/course'}">繼續單元 ${icon('arrow-right')}</a><a class="btn" href="${reviewHref}">${due ? '今日複習' : '今日練習'}</a></div>
+      </div>
     </section>
     ${window.Motion && Motion.pref() === 'auto' && Motion.systemReduce() ? '<p class="motion-note">你的系統開啟了「減少動態效果」，所以網站先停用動畫。<a href="#/settings">到設定開啟動畫</a></p>' : ''}
     ${marquee()}
@@ -116,7 +118,7 @@
       <div class="lesson-preview"><p class="eyebrow">Unit ${unit.index} / ${unit.total}</p>
         ${samples.length ? `<div class="lesson-samples ${unit.kana.length ? 'kana-samples' : ''}">${samples.map(x => `<div><span lang="ja">${esc(x.word)}</span><small>${esc(x.reading || '')}</small></div>`).join('')}</div>` : `<p class="lesson-title-preview" lang="ja">${esc(unit.title)}</p>`}
       </div>
-      <div class="lesson-info"><h2>${unit.title.startsWith(profile.level) ? '' : profile.level + ' '}${esc(unit.title)}</h2><div class="lesson-progress"><div class="bar" role="progressbar" aria-label="目前單元學習進度" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100"><div class="fill" style="width:${st.pct}%"></div></div><span class="meta">${unit.readOnly ? st.read ? '已讀完' : '尚未讀完' : `${st.learned} / ${st.total} 項已學`}</span></div><p class="meta lesson-desc">${esc(unit.desc)}</p><a class="text-link" href="#/unit/${esc(unit.key)}">繼續單元 ${icon('arrow-right')}</a></div>
+      <div class="lesson-info"><h2>${unit.title.startsWith(profile.level) ? '' : profile.level + ' '}${esc(unit.title)}</h2><div class="lesson-progress"><div class="paws" role="progressbar" aria-label="目前單元學習進度" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100">${Array.from({ length: 10 }, (_, i) => `<i class="paw ${i < Math.round(st.pct / 10) ? 'on' : ''}" style="--i:${i}"></i>`).join('')}</div><span class="meta">${unit.readOnly ? st.read ? '已讀完' : '尚未讀完' : `${st.learned} / ${st.total} 項已學`}</span></div><p class="meta lesson-desc">${esc(unit.desc)}</p><a class="text-link" href="#/unit/${esc(unit.key)}">繼續單元 ${icon('arrow-right')}</a></div>
     </div></section>` : '<section class="card"><h2>這一級還沒有課程</h2><a href="#/course">探索其他等級</a></section>'}
     <section class="home-sec">${secHead('03', 'Play', '輕鬆一下')}${todayExtras(profile.level, unit)}</section>
     <section class="home-sec upcoming">${secHead('04', 'Next', '接下來的學習內容', '', `<a class="text-link" href="#/course/${profile.level}">查看全部課程 ${icon('arrow-right')}</a>`)}
@@ -259,16 +261,26 @@
     const topics = L.topics.filter(t => !theme || t.theme === theme);
     const card = t => {
       const u = Curriculum.get(`${t.level}-life-${t.id}`), st = u ? Curriculum.stats(u) : null;
+      // 一張卡片只留一個框：主題和單元位置寫成一行小字；開始學了才出現細進度條
+      const started = st && (st.seen > 0 || st.read);
+      const progress = started
+        ? `<span class="bar thin"><span class="fill" style="width:${st.pct}%"></span></span><span class="meta">${st.done ? '已達標' : `${st.learned} / ${st.total} 已學`}</span>`
+        : st ? `<span class="meta">${st.total} 項・還沒開始</span>` : '';
       return `<a class="life-card ${THEME_CLASS[t.theme] || ''}" href="#/unit/${esc(u?.key || '')}">
-        <span class="life-card-top">${themeGlyph(t.theme, 'big')}<span class="life-meta"><span class="tag">${esc(t.theme)}</span><span class="tag">${esc(t.level)}${u ? ` 第 ${u.index} 單元` : ''}</span></span></span>
-        <b>${esc(t.title)}</b><small>${esc(t.desc)}</small>
-        ${st ? `<span class="bar"><span class="fill" style="width:${st.pct}%"></span></span><span class="meta">${st.done ? '已達標' : `${st.learned} / ${st.total} 已學`}</span>` : ''}</a>`;
+        <span class="life-card-top">${themeGlyph(t.theme, 'big')}<span class="life-meta">${esc(t.theme)}・${esc(t.level)}${u ? ` 第 ${u.index} 單元` : ''}</span></span>
+        <b>${esc(t.title)}</b><small>${esc(t.desc)}</small>${progress}</a>`;
     };
+    // 全部主題時依主題分組，同一種顏色放在一起
+    const groups = theme ? [[theme, topics]] : themes.map(th => [th, topics.filter(t => t.theme === th)]).filter(([, ts]) => ts.length);
+    const grid = groups.map(([th, ts]) => `<section class="life-group">
+      <h2 class="life-group-head">${themeGlyph(th, 'tiny')} ${esc(th)} <small>${ts.length} 個主題</small></h2>
+      <div class="life-grid">${ts.map(card).join('')}</div>
+    </section>`).join('');
     return `
     <section class="page-head"><h1>${glyph('和', 'title')} 生活日本</h1>
       <div class="actions">${['', ...themes].map(th => `<a class="btn small ${th === theme ? 'primary' : ''}" href="#/life${th ? '/' + encodeURIComponent(th) : ''}">${th ? themeGlyph(th, 'tiny') + ' ' + esc(th) : '全部主題'}</a>`).join('')}</div>
     </section>
-    <div class="life-grid">${topics.map(card).join('')}</div>
+    ${grid}
     <section class="card"><h2>想加自己的主題？</h2>
       <p>最簡單的方式是寫在 Notion：在「詞彙整理」新增一段，例如「## 動畫《○○》學到的單字」，放一張「單字／讀音／意思」表格；句子用「日語／中文」表格。隔天同步後，它會自動變成課程裡的「Notion 新筆記」單元。</p>
       <p class="meta">想要有對話、小問答的完整主題，可以在 <code>data/life.js</code> 照現有格式新增。</p>
@@ -680,7 +692,7 @@
       it.word ? `<a href="https://jisho.org/search/${encodeURIComponent(it.word)}" target="_blank" rel="noopener">查辭典與用例</a>` : '',
       `下次到期：${fmtDate(stat.due)}・跨日獨立答對 ${stat.retained}/3 次`,
       it.source ? `<span class="meta">出處：${esc(it.source)}</span>` : ''].filter(Boolean).join('<br>');
-    $('#feedback').innerHTML = `<div class="card ${ok ? 'good' : 'bad'}">${ok ? icon('check-circle') : icon('x')}<b>${ok ? (q.usedHint ? '練習答對，之後再獨立回想' : '獨立答對！') : '再看一次正確答案'}：${esc(q.answer)}</b><div class="extra">${extra}</div>
+    $('#feedback').innerHTML = `<div class="card ${ok ? 'good' : 'bad'}">${window.Art ? Art.char(ok ? 'maneki' : 'uruuru', 'fb-cat') : ok ? icon('check-circle') : icon('x')}<b>${ok ? (q.usedHint ? '練習答對，之後再獨立回想' : '獨立答對！') : '再看一次正確答案'}：${esc(q.answer)}</b><div class="extra">${extra}</div>
       <button class="btn primary" id="next">${quiz.i + 1 < quiz.qs.length ? '下一題 →' : '看結果 '}</button></div>`;
     $('#next').focus();
   }
@@ -688,6 +700,8 @@
   function nextQuestion() {
     quiz.i++; quiz.answered = false;
     if (quiz.i < quiz.qs.length) renderQuestion(); else renderResult();
+    // 回饋卡片很長時會捲到頁面下方，換題後回到頂端
+    window.scrollTo(0, 0);
   }
 
   // 結果頁的主要按鈕：單元練習 → 回單元、再練、達標就下一單元；其他 → 再來一次
@@ -945,7 +959,10 @@
     if (!head || head.querySelector('.display-en')) return;
     const en = head.dataset.en || HEAD_EN[view];
     if (en) head.insertAdjacentHTML('afterbegin', `<p class="display-en" aria-hidden="true">${esc(en)}</p>`);
+    const cat = HEAD_CAT[view];
+    if (cat && window.Art) head.insertAdjacentHTML('afterbegin', `<span class="head-cat">${Art.char(cat)}</span>`);
   }
+  const HEAD_CAT = { course: 'shiro', map: 'shiro', unit: 'walk', life: 'chatora', review: 'mike', reference: 'shiro', notes: 'shiro', kana: 'kuro', kanji: 'mike', quiz: 'maneki', settings: 'akubi', sync: 'walk', voice: 'chatora' };
 
   document.addEventListener('submit', e => {
     if (e.target.id === 'study-profile') {
