@@ -261,16 +261,26 @@
     const topics = L.topics.filter(t => !theme || t.theme === theme);
     const card = t => {
       const u = Curriculum.get(`${t.level}-life-${t.id}`), st = u ? Curriculum.stats(u) : null;
+      // 一張卡片只留一個框：主題和單元位置寫成一行小字；開始學了才出現細進度條
+      const started = st && (st.seen > 0 || st.read);
+      const progress = started
+        ? `<span class="bar thin"><span class="fill" style="width:${st.pct}%"></span></span><span class="meta">${st.done ? '已達標' : `${st.learned} / ${st.total} 已學`}</span>`
+        : st ? `<span class="meta">${st.total} 項・還沒開始</span>` : '';
       return `<a class="life-card ${THEME_CLASS[t.theme] || ''}" href="#/unit/${esc(u?.key || '')}">
-        <span class="life-card-top">${themeGlyph(t.theme, 'big')}<span class="life-meta"><span class="tag">${esc(t.theme)}</span><span class="tag">${esc(t.level)}${u ? ` 第 ${u.index} 單元` : ''}</span></span></span>
-        <b>${esc(t.title)}</b><small>${esc(t.desc)}</small>
-        ${st ? `<span class="bar"><span class="fill" style="width:${st.pct}%"></span></span><span class="meta">${st.done ? '已達標' : `${st.learned} / ${st.total} 已學`}</span>` : ''}</a>`;
+        <span class="life-card-top">${themeGlyph(t.theme, 'big')}<span class="life-meta">${esc(t.theme)}・${esc(t.level)}${u ? ` 第 ${u.index} 單元` : ''}</span></span>
+        <b>${esc(t.title)}</b><small>${esc(t.desc)}</small>${progress}</a>`;
     };
+    // 全部主題時依主題分組，同一種顏色放在一起
+    const groups = theme ? [[theme, topics]] : themes.map(th => [th, topics.filter(t => t.theme === th)]).filter(([, ts]) => ts.length);
+    const grid = groups.map(([th, ts]) => `<section class="life-group">
+      <h2 class="life-group-head">${themeGlyph(th, 'tiny')} ${esc(th)} <small>${ts.length} 個主題</small></h2>
+      <div class="life-grid">${ts.map(card).join('')}</div>
+    </section>`).join('');
     return `
     <section class="page-head"><h1>${glyph('和', 'title')} 生活日本</h1>
       <div class="actions">${['', ...themes].map(th => `<a class="btn small ${th === theme ? 'primary' : ''}" href="#/life${th ? '/' + encodeURIComponent(th) : ''}">${th ? themeGlyph(th, 'tiny') + ' ' + esc(th) : '全部主題'}</a>`).join('')}</div>
     </section>
-    <div class="life-grid">${topics.map(card).join('')}</div>
+    ${grid}
     <section class="card"><h2>想加自己的主題？</h2>
       <p>最簡單的方式是寫在 Notion：在「詞彙整理」新增一段，例如「## 動畫《○○》學到的單字」，放一張「單字／讀音／意思」表格；句子用「日語／中文」表格。隔天同步後，它會自動變成課程裡的「Notion 新筆記」單元。</p>
       <p class="meta">想要有對話、小問答的完整主題，可以在 <code>data/life.js</code> 照現有格式新增。</p>

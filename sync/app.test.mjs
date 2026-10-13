@@ -177,8 +177,11 @@ test('生活日本：總覽、主題單元的對話、文化小問答、今日�
   a.route('#/life');
   assert.equal(a.document.querySelector('nav.top a.active').textContent.trim(), '生活日本');
   assert.equal(main().querySelectorAll('.life-card').length, a.ctx.NIHONGO_LIFE.topics.length);
+  assert.equal(main().querySelectorAll('.life-group').length, Object.keys(a.ctx.NIHONGO_LIFE.themes).length, '依主題分組');
+  assert.equal(main().querySelectorAll('.life-card .bar').length, 0, '還沒開始的主題不顯示進度條');
   a.route('#/life/' + encodeURIComponent('食物'));
-  assert.ok(main().querySelectorAll('.life-card').length >= 2 && [...main().querySelectorAll('.life-card .tag')].some(t => t.textContent === '食物'));
+  assert.ok(main().querySelectorAll('.life-card').length >= 2 && [...main().querySelectorAll('.life-card .life-meta')].every(m => m.textContent.startsWith('食物・')));
+  assert.equal(main().querySelectorAll('.life-group').length, 1, '篩選後只有一組');
 
   a.route('#/unit/N5-life-ramen');
   assert.ok(!main().innerHTML.includes('undefined'));

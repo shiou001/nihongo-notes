@@ -251,3 +251,16 @@ footer .hill-art path:last-child{opacity:.12}
 }
 /* 粉紅標題卡調淡（按鈕維持原本的櫻花粉） */
 .hero-card{background:#fac8d3}
+/* 生活日本：整理成兩色、一張卡片一個框 */
+.glyph.food,.glyph.season{background:var(--sakura-soft);color:var(--ink)}
+.glyph.anime,.glyph.travel{background:var(--butter-soft);color:var(--ink)}
+.glyph.title{background:var(--sakura);color:var(--ink);border:2px solid var(--ink)}
+.u-kind.tag.life{background:#fff}
+.life-group{margin:0 0 34px}
+.life-group-head{display:flex;align-items:center;gap:10px;font-size:1.25rem;margin:0 0 16px}
+.life-group-head .glyph{width:1.7em;height:1.7em;font-size:.9em}
+.life-group-head small{font-family:var(--font-body);font-weight:400}
+.life-card .life-meta{display:block;font-size:.8rem;font-weight:700;color:var(--ink-soft);letter-spacing:.04em;text-align:right}
+.life-card-top{align-items:center}
+.life-card .bar.thin{height:6px;border:0;background:var(--sakura-soft)}
+.life-card .bar.thin .fill{border:0}
