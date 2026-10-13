@@ -16,7 +16,13 @@
   const THEME_CLASS = { 食物: 'food', 動畫: 'anime', 旅遊: 'travel', 季節: 'season' };
   const glyph = (ch, cls = '') => `<span class="glyph ${cls}" aria-hidden="true" lang="ja">${esc(ch)}</span>`;
   const themeGlyph = (theme, cls = '') => glyph(LIFE().themes[theme]?.glyph || '和', `${THEME_CLASS[theme] || ''} ${cls}`);
-  const doodle = n => icon(({ onigiri: 'cards', cloud: 'chart-line', star: 'check-circle', torii: 'calendar-blank' })[n] || 'book-open');
+  // 小角色（js/art.js）；沒載入時退回圖示
+  const CHAR_OF = { onigiri: 'onigiri', daruma: 'daruma', maneki: 'neko', torii: 'flower', fuji: 'bird', cloud: 'bird', star: 'flower' };
+  const doodle = n => window.Art ? Art.char(CHAR_OF[n] || 'onigiri') : icon(({ onigiri: 'cards', cloud: 'chart-line', star: 'check-circle', torii: 'calendar-blank' })[n] || 'book-open');
+  // 首頁的編號區段標題：(01) 大大的英文 ＋ 中文
+  const secHead = (no, en, zh, id = '', link = '') => `<header class="sec-head"><p class="sec-no">(${no})</p><h2${id ? ` id="${id}"` : ''}><span class="sec-en" aria-hidden="true">${en}</span><span class="sec-zh">${zh}</span></h2>${link}</header>`;
+  const MARQUEE = [['にほんご', 'Nihongo'], ['ことば', 'Kotoba'], ['ひらがな', 'Hiragana'], ['かんじ', 'Kanji'], ['かいわ', 'Kaiwa'], ['たべもの', 'Tabemono'], ['たび', 'Tabi'], ['きせつ', 'Kisetsu']];
+  const marquee = () => { const row = MARQUEE.map(([ja, en]) => `<span lang="ja">${ja}</span><em>${en}</em><i></i>`).join(''); return `<div class="marquee" aria-hidden="true"><div class="marquee-track">${row}${row}</div></div>`; };
   const fmtDate = iso => { try { return new Date(iso).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
 
   // ────────────────────────────── 首頁 ──────────────────────────────
@@ -81,26 +87,59 @@
     const due = dueCount(), daily = Quiz.buildQuestions(Study.dailyOptions());
     const count = due || daily.length;
     const samples = unit ? (unit.kana.length ? unit.kana.slice(0, 5).map(k => ({ word: k.hira, reading: k.romaji })) : unit.auto === 'vocab' ? unit.items.vocab.slice(0, 3) : unit.kanji.length ? unit.kanji.slice(0, 5).map(k => ({ word: k.k })) : []) : [];
-    return `<section class="today-head"><h1>今日，留一點時間給<span>日文</span>。</h1><p>一點一點累積，日文會成為你生活中的一部分。</p></section>
-    <section class="review-banner" aria-labelledby="today-review">
-      <div class="review-symbol">${icon('cards-three')}</div>
-      <div class="review-copy"><h2 id="today-review">${due ? '今日複習' : '今日練習'}</h2><p class="review-count"><strong>${count}</strong><span>${due ? '題到期' : '題可練習'}${count ? `・${count > 20 ? '本輪 20 題，' : ''}約 ${Math.max(2, Math.ceil(Math.min(count, 20) * .6))} 分鐘` : ''}</span></p><p class="meta">${due ? '複習已學過的內容，加深記憶。' : count ? '目前沒有到期題目，從一點新內容開始。' : '今天的份量完成了，也可以繼續探索課程。'}</p></div>
-      <a class="btn primary" href="${count ? due ? '#/quiz?mode=due' : '#/quiz?mode=daily' : '#/course'}">${count ? due ? '開始複習' : '開始練習' : '探索課程'} ${icon('arrow-right')}</a>
+    const sum = Curriculum.levelSummary(profile.level), A = window.Art, now = new Date();
+    const date = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}　${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()]}.`;
+    const reviewHref = count ? due ? '#/quiz?mode=due' : '#/quiz?mode=daily' : '#/course';
+    return `
+    <section class="home-hero" aria-label="今日">
+      ${A ? A.hero() + A.petals() : ''}
+      <canvas class="petal-scene" aria-hidden="true"></canvas>
+      <div class="hero-copy">
+        <p class="hero-date">${date}</p>
+        <h1 class="hero-title"><span class="sr-only">にほんごノート </span>Nihongo<br>Note</h1>
+        <p class="hero-greet" lang="ja">${greeting()}</p>
+        <p class="hero-lead">今日，留一點時間給日文。<br>一點一點累積，日文會成為生活的一部分。</p>
+      </div>
+      ${A ? `<a class="hero-badge" href="#/course/${profile.level}">${A.ring(sum.pct, `${profile.level} 達成率`, `${sum.done} / ${sum.total} 單元`)}</a>` : ''}
+      <div class="hero-cta"><a class="btn primary" href="${unit ? '#/unit/' + esc(unit.key) : '#/course'}">繼續單元 ${icon('arrow-right')}</a><a class="btn" href="${reviewHref}">${due ? '今日複習' : '今日練習'}</a></div>
+      <p class="hero-scroll" aria-hidden="true">Scroll</p>
     </section>
-    ${unit ? `<section class="current-lesson">
-      <div class="lesson-preview"><p class="eyebrow">目前學習單元</p>
+    ${window.Motion && Motion.pref() === 'auto' && Motion.systemReduce() ? '<p class="motion-note">你的系統開啟了「減少動態效果」，所以網站先停用動畫。<a href="#/settings">到設定開啟動畫</a></p>' : ''}
+    ${marquee()}
+    <section class="home-sec" aria-labelledby="today-review">
+      ${secHead('01', 'Review', due ? '今日複習' : '今日練習', 'today-review')}
+      <div class="review-sec">
+        <div class="review-copy"><p class="stat-label">${due ? '到期的題目' : '可以練習的題目'}</p><p class="big-stat"><b data-count="${count}">${count}</b><small>題</small></p></div>
+        <div class="review-side">
+          <p class="meta">${count ? `${count > 20 ? '本輪 20 題，' : ''}約 ${Math.max(2, Math.ceil(Math.min(count, 20) * .6))} 分鐘。` : ''}${due ? '複習已學過的內容，加深記憶。' : count ? '目前沒有到期題目，從一點新內容開始。' : '今天的份量完成了，也可以繼續探索課程。'}</p>
+          <a class="btn primary" href="${reviewHref}">${count ? due ? '開始複習' : '開始練習' : '探索課程'} ${icon('arrow-right')}</a>
+          ${A ? `<div class="review-chars">${A.char('onigiri')}${A.char('flower')}${A.char('bird')}</div>` : ''}
+        </div>
+      </div>
+    </section>
+    ${unit ? `<section class="home-sec">${secHead('02', 'Lesson', '目前學習單元')}<div class="current-lesson">
+      <div class="lesson-preview"><p class="eyebrow">Unit ${unit.index} / ${unit.total}</p>
         ${samples.length ? `<div class="lesson-samples ${unit.kana.length ? 'kana-samples' : ''}">${samples.map(x => `<div><span lang="ja">${esc(x.word)}</span><small>${esc(x.reading || '')}</small></div>`).join('')}</div>` : `<p class="lesson-title-preview" lang="ja">${esc(unit.title)}</p>`}
-        <p class="meta preview-caption">ここから。一步一步，打好基礎。</p>
+        <p class="meta preview-caption" lang="ja">ここから。一歩ずつ。</p>
       </div>
       <div class="lesson-info"><h2>${unit.title.startsWith(profile.level) ? '' : profile.level + ' '}${esc(unit.title)}</h2><div class="lesson-progress"><div class="bar" role="progressbar" aria-label="目前單元學習進度" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100"><div class="fill" style="width:${st.pct}%"></div></div><span class="meta">${unit.readOnly ? st.read ? '已讀完' : '尚未讀完' : `${st.learned} / ${st.total} 項已學`}</span></div><p class="meta lesson-desc">${esc(unit.desc)}</p><a class="text-link" href="#/unit/${esc(unit.key)}">繼續單元 ${icon('arrow-right')}</a></div>
-    </section>` : '<section class="card"><h2>這一級還沒有課程</h2><a href="#/course">探索其他等級</a></section>'}
-    ${todayExtras(profile.level, unit)}
-    <section class="upcoming"><div class="section-heading"><h2>接下來的學習內容</h2><a class="text-link" href="#/course/${profile.level}">查看全部課程 ${icon('arrow-right')}</a></div>
+    </div></section>` : '<section class="card"><h2>這一級還沒有課程</h2><a href="#/course">探索其他等級</a></section>'}
+    <section class="home-sec">${secHead('03', 'Play', '輕鬆一下')}${todayExtras(profile.level, unit)}</section>
+    <section class="home-sec upcoming">${secHead('04', 'Next', '接下來的學習內容', '', `<a class="text-link" href="#/course/${profile.level}">查看全部課程 ${icon('arrow-right')}</a>`)}
       ${upcoming.length ? `<ol class="next-lessons">${upcoming.map(u => `<li><a href="#/unit/${esc(u.key)}">${icon('book-open')}<span class="next-title">${esc(u.title)}</span><span class="meta next-desc">${esc(u.desc)}</span>${icon('arrow-right')}</a></li>`).join('')}</ol>` : '<p class="meta">這一級已走到最後一個單元。繼續複習，讓學過的內容留下來。</p>'}
     </section>`;
   }
+  function motionSettings() {
+    const M = window.Motion;
+    if (!M) return '';
+    const cur = M.pref(), opts = [['auto', '跟隨系統'], ['on', '開啟'], ['off', '關閉']];
+    return `<section class="card"><h2>動畫效果</h2>
+      <p class="meta">開場動畫、捲動淡入、3D 櫻花瓣、角色散步。${M.systemReduce() ? '你的系統目前設定為「減少動態效果」，選「跟隨系統」時網站不會播放動畫。' : '你的系統允許動畫。'}</p>
+      <div class="chips" role="radiogroup" aria-label="動畫效果">${opts.map(([v, label]) => `<button type="button" class="chip ${cur === v ? 'on' : ''}" role="radio" aria-checked="${cur === v}" data-motion="${v}">${label}</button>`).join('')}</div>
+    </section>`;
+  }
   function viewSettings() {
-    return `<section class="page-head"><h1>設定</h1><p class="lead">照自己的步調，安排日文學習。</p></section><section class="card"><h2>學習偏好</h2>${studyForm()}<p id="settings-status" class="meta" role="status"></p></section><div class="ref-grid"><a class="card ref" href="#/voice"><h2>${icon('speaker-high')} 聲音</h2><p>調整日文朗讀的聲音與速度。</p></a><a class="card ref" href="#/sync"><h2>${icon('cloud')} 跨裝置同步</h2><p>把學習進度接到另一台裝置。</p></a></div>`;
+    return `<section class="page-head"><h1>設定</h1><p class="lead">照自己的步調，安排日文學習。</p></section><section class="card"><h2>學習偏好</h2>${studyForm()}<p id="settings-status" class="meta" role="status"></p></section>${motionSettings()}<div class="ref-grid"><a class="card ref" href="#/voice"><h2>${icon('speaker-high')} 聲音</h2><p>調整日文朗讀的聲音與速度。</p></a><a class="card ref" href="#/sync"><h2>${icon('cloud')} 跨裝置同步</h2><p>把學習進度接到另一台裝置。</p></a></div>`;
   }
 
   // ────────────────────────────── 課程 ──────────────────────────────
@@ -152,7 +191,7 @@
     const prev = list[u.index - 2], next = list[u.index];
     const lv = PLAN().find(x => x.level === u.level) || {};
     return `
-    <section class="page-head">
+    <section class="page-head" data-en="Unit ${u.index}">
       <p class="meta"><a href="#/course/${u.level}"> ${u.level} 課程</a> › 第 ${u.index} / ${u.total} 單元</p>
       <h1><span class="tag">${u.auto === 'life' ? `${themeGlyph(u.theme, 'tiny')} 生活日本・${esc(u.theme)}` : `${kindIcon(u.kind)} ${esc(u.kind)}`}</span>${u.fresh ? ' <span class="tag fresh">Notion 新筆記</span>' : ''} ${esc(u.title)}</h1>
       ${u.desc ? `<p class="lead">${esc(u.desc)}</p>` : ''}
@@ -412,11 +451,11 @@
     const fresh = Curriculum.freshUnits().filter(u => Curriculum.stats(u).status === 'todo');
     const p = phraseOfDay();
     return `${fresh.length ? `<section class="fresh-note">${icon('notebook')}<p>Notion 有新筆記，已排進課程：${fresh.map(u => `<a href="#/unit/${esc(u.key)}">${esc(u.title)}（${u.level} 第 ${u.index} 單元）</a>`).join('、')}</p></section>` : ''}
-    <section class="today-play" aria-label="輕鬆一下">
+    <div class="today-play">
       ${p ? `<article class="play-card phrase-day"><p class="eyebrow">今日一句</p><p class="pd-jp" lang="ja">${esc(p.jp)}</p><details><summary>看中文</summary><p>${esc(p.zh)}</p><p class="meta">${esc(p.from)}</p></details><button class="btn small" data-say="${esc(p.jp)}">${icon('speaker-high')} 聽</button></article>` : ''}
       ${nextLife ? `<a class="play-card life-next ${THEME_CLASS[nextLife.theme] || ''}" href="#/unit/${esc(nextLife.key)}">${themeGlyph(nextLife.theme, 'big')}<p class="eyebrow">生活日本・${esc(nextLife.theme)}</p><b>${esc(nextLife.title)}</b><small>${esc(nextLife.desc)}</small></a>` : ''}
       ${playUnit ? `<a class="play-card game-next" href="#/play/match?unit=${encodeURIComponent(playUnit.key)}">${icon('cards-three')}<p class="eyebrow">一分鐘小遊戲</p><b>配對：${esc(playUnit.title)}</b><small>把日文和意思連起來，挑戰最快紀錄。</small></a>` : ''}
-    </section>`;
+    </div>`;
   }
 
   // ────────────────────────────── 複習 ──────────────────────────────
@@ -904,7 +943,17 @@
       default: app().innerHTML = viewToday();
     }
     labelAudio();
+    decorateHead(view);
+    window.Motion?.enhance(app());
     if (view === 'notes' && /^\d+$/.test(params.get('section') || '')) document.getElementById('lesson-' + params.get('section'))?.scrollIntoView();
+  }
+  // 每頁的大標題：窄體襯線的英文（裝飾用，螢幕閱讀器略過）
+  const HEAD_EN = { course: 'Course', map: 'Course', life: 'Life in Japan', review: 'Review', reference: 'Library', notes: 'Notes', kana: 'Kana', kanji: 'Kanji', quiz: 'Practice', settings: 'Settings', sync: 'Sync', voice: 'Voice', unit: 'Unit' };
+  function decorateHead(view) {
+    const head = app().querySelector('.page-head');
+    if (!head || head.querySelector('.display-en')) return;
+    const en = head.dataset.en || HEAD_EN[view];
+    if (en) head.insertAdjacentHTML('afterbegin', `<p class="display-en" aria-hidden="true">${esc(en)}</p>`);
   }
 
   document.addEventListener('submit', e => {
@@ -933,6 +982,8 @@
     if (e.target.closest('#nav-toggle')) {
       const open = document.body.classList.toggle('nav-open'); $('#nav-toggle').setAttribute('aria-expanded', String(open)); return;
     }
+    const mo = e.target.closest('[data-motion]');
+    if (mo && window.Motion) { Motion.setPref(mo.dataset.motion); app().innerHTML = viewSettings(); decorateHead('settings'); Motion.enhance(app()); return; }
     const mr = e.target.closest('#mark-read');
     if (mr) { const u = Curriculum.get(mr.dataset.unit); if (u) { Curriculum.markRead(u); app().innerHTML = viewUnit(u.key); } return; }
     if (e.target.closest('#learned-next')) { const q = quiz.qs[quiz.i]; q.previewSeen = true; q.usedHint = true; return renderQuestion(); }
@@ -989,8 +1040,12 @@
     if (e.target.id === 'note-chapter') location.hash = '#/notes/' + e.target.value;
     if (e.target.closest('.chip')) document.querySelectorAll('.chip input').forEach(input => input.closest('.chip').classList.toggle('on', input.checked));
   });
-  window.addEventListener('hashchange', route);
+  window.addEventListener('hashchange', () => (window.Motion ? Motion.swap(route) : route()));
   window.addEventListener('DOMContentLoaded', () => {
+    window.Motion?.init();
+    // 頁尾的草地和角色
+    const foot = document.querySelector('footer .foot-art');
+    if (foot && window.Art) foot.innerHTML = Art.hill() + `<div class="foot-chars">${Art.char('flower')}${Art.char('onigiri')}${Art.char('neko')}</div>`;
 
     Sync.init();
     // 聲音清單是非同步載入的：在聲音頁的話，載好後重畫

@@ -1,3 +1,5 @@
+> 2026-10-14：這份是 v0.9 紙張＋Phosphor 版面的設計驗收紀錄。v0.11 已改成自然系設計（css/natural.css），theme.css 已移除；新設計的說明在 README「設計與動畫」與 spec 第 15 節。
+
 # Bear + Phosphor redesign — design QA
 
 final result: passed

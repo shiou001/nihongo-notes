@@ -26,6 +26,22 @@
 
 每個能練習的單元都有「換個方式練」：配對遊戲、聽力挑戰、句子重組、角色扮演（依單元內容出現）。配對和句子重組第一次就做對的題目會算進單元進度。
 
+## 設計與動畫（v0.11）
+
+風格參考 L'OCCITANE 的 Sustainability 頁：紙張顆粒的暖米白底、梅咖啡色文字、森林綠與向日葵黃、窄體襯線的英文大標題（Instrument Serif）配明朝體（Shippori Mincho、Noto Serif TC），區段用「(01)」編號。插畫（大樹、草地、飯糰、達摩、小花、小鳥、貓）都是 [js/art.js](js/art.js) 裡的原創 SVG。
+
+| 效果 | 在哪裡 | 檔案 |
+|---|---|---|
+| 開場動畫：畫一個圓、「にほんご」浮上來、布幕往上收 | 每個分頁第一次打開 | `js/motion.js` |
+| 3D 櫻花瓣，滑鼠移動會起風（Three.js） | 首頁大圖 | `js/scene.js` |
+| 角色在草地上散步、樹冠與雲的視差 | 首頁大圖 | `js/art.js`、`css/natural.css` |
+| 標題逐字浮現、區塊捲動淡入、數字從 0 數上來、進度圈畫出來 | 每一頁 | `js/motion.js` |
+| 換頁交叉淡入（View Transitions） | 換頁時 | `js/motion.js` |
+| 按鈕顏色從左邊刷進來、主要按鈕磁吸、卡片跟著滑鼠傾斜、列表滑入 | 滑鼠懸停 | `css/natural.css` |
+| 跑馬燈、捲動進度條 | 首頁、頁首 | `css/natural.css` |
+
+**設定 → 動畫效果** 可以選「跟隨系統／開啟／關閉」。預設跟隨系統：Windows 關掉「動畫效果」或 macOS 開「減少動態效果」時，網站也不播動畫，首頁會提示可以到設定開啟。
+
 ## 直接使用
 
 雙擊 `index.html` 就能用（不需要伺服器）。想用 localhost：
@@ -200,7 +216,10 @@ npm test
 
 ```
 index.html           單頁應用入口
-css/style.css        基礎樣式（theme.css 紙張風格、life.css 生活日本與小遊戲）
+css/style.css        基礎樣式（natural.css 自然系外觀、life.css 生活日本與小遊戲）
+js/art.js            原創 SVG 插畫與小角色
+js/motion.js         開場、捲動、懸停、換頁動畫與「動畫效果」設定
+js/scene.js          首頁 3D 櫻花瓣（Three.js，動態載入）
 js/app.js            路由 + 各視圖
 js/quiz.js           出題引擎、熟練度規則
 js/progress.js       localStorage 進度 + 合併規則

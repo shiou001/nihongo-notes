@@ -317,9 +317,8 @@ summary { min-height: 44px; padding: .4rem 0; }
   .feedback .card { grid-template-columns: 40px 1fr; }
   .quiz-top { flex-wrap: wrap; gap: .4rem; }
 }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-}
+/* 減少動態效果：由 js/motion.js 依「設定 → 動畫效果」加上 html.reduce-motion */
+html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 
 /* ───────────────────────────── 課程／單元 ───────────────────────────── */
 .units { list-style: none; padding: .4rem .6rem; margin: 0; }

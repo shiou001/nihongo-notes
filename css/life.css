@@ -3,21 +3,21 @@
 /* 主題字：用漢字當圖示（食、動、旅、季、和） */
 .glyph{display:inline-grid;place-items:center;font-family:'Klee One','Zen Kurenaido',serif;font-weight:600;line-height:1;border-radius:7px;background:var(--paper-2);color:var(--ink);width:1.35em;height:1.35em;flex-shrink:0}
 .glyph.tiny{width:1.45em;height:1.45em;font-size:.85em;border-radius:5px;vertical-align:-.2em}
-.glyph.big{width:56px;height:56px;font-size:1.9rem;border-radius:12px}
+.glyph.big{width:56px;height:56px;font-size:1.9rem;border-radius:18px}
 .glyph.title{width:1.3em;height:1.3em;font-size:.85em;vertical-align:-.08em;background:var(--red);color:#fff}
 .glyph.food{background:#f6e6cf;color:#8a5a1c}
 .glyph.anime{background:#ece3f1;color:#6b4a80}
 .glyph.travel{background:#e1ebf1;color:#2f5f7a}
 .glyph.season{background:#f5e1e3;color:#9a3c4a}
 nav.top a .glyph.nav{width:28px;height:28px;font-size:1rem;background:transparent;border:1.5px solid currentColor;border-radius:7px}
-.tag.fresh{background:#e4eee6;color:#315438;vertical-align:.1em}
+.tag.fresh{background:var(--good-soft);color:var(--good);vertical-align:.1em}
 
 /* 單元頁：換個方式練 */
 .activity-row{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
 .activity-row>.meta{margin:0 0 10px}
 .activity-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
-.activity{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#fffefd;text-decoration:none;transition:background .15s,border-color .15s}
-.activity:hover{background:#f8eeeb;border-color:#d8b9b4}
+.activity{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--cream);text-decoration:none;transition:background .15s,border-color .15s}
+.activity:hover{background:var(--yellow-soft);border-color:var(--line-2)}
 .activity .ph-icon{color:var(--red);width:26px;height:26px;margin-top:2px}
 .activity b{display:block;font-weight:600}
 .activity small{display:block;color:var(--ink-soft);font-size:.85rem;line-height:1.6}
@@ -38,16 +38,16 @@ nav.top a .glyph.nav{width:28px;height:28px;font-size:1rem;background:transparen
 .bubble{display:grid;gap:4px;max-width:min(580px,88%);justify-self:start;justify-items:start}
 .bubble.me{justify-self:end;justify-items:end;text-align:right}
 .bubble .who{font-size:.8rem;color:var(--ink-soft)}
-.say-line{font:inherit;text-align:inherit;cursor:pointer;border:1px solid var(--line);background:#fffefd;border-radius:14px 14px 14px 4px;padding:10px 16px;font-family:'Klee One',serif;font-size:1.15rem;line-height:1.7;color:var(--ink);transition:border-color .15s}
-.bubble.me .say-line{background:#f7eeec;border-color:#e6cfca;border-radius:14px 14px 4px 14px}
-.say-line:hover{border-color:#bd7e81}
+.say-line{font:inherit;text-align:inherit;cursor:pointer;border:1px solid var(--line);background:var(--cream);border-radius:14px 14px 14px 4px;padding:10px 16px;font-family:'Klee One',serif;font-size:1.15rem;line-height:1.7;color:var(--ink);transition:border-color .15s}
+.bubble.me .say-line{background:var(--sakura-soft);border-color:var(--sakura);border-radius:14px 14px 4px 14px}
+.say-line:hover{border-color:var(--green)}
 .bubble .zh{font-size:.9rem;color:var(--ink-soft)}
 
 /* 文化小問答 */
 .trivia-q{padding:14px 0;border-top:1px solid var(--line)}
 .trivia-q p{margin:0 0 10px}
 .trivia-choices{display:flex;flex-wrap:wrap;gap:8px}
-.trivia-choices .btn.correct{background:#e4eee6;border-color:#789780;color:#315438;opacity:1}
+.trivia-choices .btn.correct{background:var(--good-soft);border-color:#789780;color:var(--good);opacity:1}
 .trivia-choices .btn.wrong{background:#f6e4e3;border-color:#b5797f;color:#8f3740;opacity:1}
 .trivia-explain{margin-top:12px!important;background:var(--paper-2);border-radius:8px;padding:10px 14px}
 
@@ -60,8 +60,8 @@ nav.top a .glyph.nav{width:28px;height:28px;font-size:1rem;background:transparen
 
 /* 生活日本總覽 */
 .life-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-bottom:24px}
-.life-card{display:flex;flex-direction:column;gap:8px;padding:20px;border:1px solid var(--line);border-radius:12px;background:#fffefd;text-decoration:none;transition:transform .15s,border-color .15s}
-.life-card:hover{border-color:#c9b3ae;transform:translateY(-2px)}
+.life-card{display:flex;flex-direction:column;gap:8px;padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--cream);text-decoration:none;transition:transform .15s,border-color .15s}
+.life-card:hover{border-color:var(--line-2);transform:translateY(-2px)}
 .life-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px}
 .life-meta{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
 .life-card b{font-size:1.08rem;line-height:1.5;font-weight:600}
@@ -70,17 +70,17 @@ nav.top a .glyph.nav{width:28px;height:28px;font-size:1rem;background:transparen
 .life-card .bar .fill{display:block;height:100%}
 
 /* 今日：Notion 新筆記、輕鬆一下 */
-.fresh-note{display:flex;gap:14px;align-items:center;background:#e4eee6;border-radius:10px;padding:14px 20px;margin-bottom:22px}
+.fresh-note{display:flex;gap:14px;align-items:center;background:var(--good-soft);border-radius:14px;padding:14px 20px;margin-bottom:22px}
 .fresh-note p{margin:0}
-.fresh-note .ph-icon{color:#315438;width:26px;height:26px}
+.fresh-note .ph-icon{color:var(--good);width:26px;height:26px}
 .today-play{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-bottom:34px}
-.play-card{display:flex;flex-direction:column;gap:6px;padding:22px;border-radius:12px;background:#fffefd;border:1px solid var(--line);text-decoration:none;min-width:0}
+.play-card{display:flex;flex-direction:column;gap:6px;padding:22px;border-radius:18px;background:var(--cream);border:1px solid var(--line);text-decoration:none;min-width:0}
 a.play-card{transition:border-color .15s,transform .15s}
-a.play-card:hover{border-color:#c9b3ae;transform:translateY(-2px)}
+a.play-card:hover{border-color:var(--line-2);transform:translateY(-2px)}
 .play-card .eyebrow{margin:6px 0 0;font-size:.88rem;color:var(--ink-soft)}
 .play-card b{font-size:1.05rem;font-weight:600;line-height:1.5}
 .play-card small{color:var(--ink-soft);line-height:1.7}
-.phrase-day{background:#f7eeec;border-color:#f0dcd8}
+.phrase-day{background:var(--yellow-soft);border-color:#f1dfa0}
 .phrase-day .eyebrow{margin:0}
 .phrase-day .pd-jp{font-family:'Klee One',serif;font-size:1.45rem;line-height:1.6;margin:2px 0 4px}
 .phrase-day details{font-size:.95rem}
@@ -91,23 +91,23 @@ a.play-card:hover{border-color:#c9b3ae;transform:translateY(-2px)}
 .game{max-width:850px;margin:auto}
 .match-board{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
 .match-col{display:grid;gap:10px;align-content:start}
-.mcard{font:inherit;cursor:pointer;min-height:64px;padding:10px 14px;border:1px solid #d8d4ce;border-radius:10px;background:#fffefd;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;color:var(--ink);transition:background .15s,border-color .15s}
+.mcard{font:inherit;cursor:pointer;min-height:64px;padding:10px 14px;border:1px solid var(--line-2);border-radius:14px;background:var(--cream);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;color:var(--ink);transition:background .15s,border-color .15s}
 .mcard [lang=ja]{font-family:'Klee One',serif;font-size:1.2rem}
 .mcard small{color:var(--ink-soft);font-size:.8rem}
-.mcard:hover{border-color:#a8a29b}
-.mcard.sel{border-color:var(--red);background:#f8eeeb;box-shadow:0 0 0 2px #f2d6d2}
-.mcard.done,.mcard.done:disabled{background:#e4eee6;border-color:#a9c4af;color:#315438;opacity:.7;cursor:default}
+.mcard:hover{border-color:var(--ink)}
+.mcard.sel{border-color:var(--red);background:var(--yellow-soft);box-shadow:0 0 0 2px var(--mint)}
+.mcard.done,.mcard.done:disabled{background:var(--good-soft);border-color:#a9c4af;color:var(--good);opacity:.7;cursor:default}
 .shake{animation:shake .35s}
 @keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
 .build-zh{font-size:1.3rem;font-weight:500;margin:4px 0 16px}
-.build-line{min-height:66px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;border:1.5px dashed #c9c4be;border-radius:10px;margin-bottom:16px}
+.build-line{min-height:66px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;border:1.5px dashed var(--line-2);border-radius:14px;margin-bottom:16px}
 .build-line.solved{border-style:solid;border-color:#789780;background:#f2f7f0}
 .build-pool{display:flex;flex-wrap:wrap;gap:10px;min-height:48px}
-.tile{font:inherit;font-family:'Klee One',serif;font-size:1.2rem;cursor:pointer;padding:8px 14px;border:1px solid #d8d4ce;border-radius:8px;background:#fffefd;min-height:48px;color:var(--ink)}
+.tile{font:inherit;font-family:'Klee One',serif;font-size:1.2rem;cursor:pointer;padding:8px 14px;border:1px solid var(--line-2);border-radius:8px;background:var(--cream);min-height:48px;color:var(--ink)}
 .tile:hover{border-color:var(--red)}
-.tile.on{background:#f7eeec;border-color:#e6cfca}
+.tile.on{background:var(--sakura-soft);border-color:var(--sakura)}
 .tile:disabled{cursor:default;border-color:#a9c4af;background:#f2f7f0}
-.listen-btn{font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:10px;margin:0 auto;padding:26px 36px;border-radius:16px;border:1px solid #e6cfca;background:#f7eeec;color:var(--red)}
+.listen-btn{font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:10px;margin:0 auto;padding:26px 36px;border-radius:16px;border:1px solid var(--sakura);background:var(--sakura-soft);color:var(--red)}
 .listen-btn:hover{border-color:var(--red)}
 .listen-btn .ph-icon{width:64px;height:64px}
 .listen-btn span:last-child{color:var(--ink);font-size:1rem}
@@ -132,4 +132,4 @@ a.play-card:hover{border-color:#c9b3ae;transform:translateY(-2px)}
   .activity-grid,.life-grid{grid-template-columns:1fr}
   .tile{font-size:1.08rem;padding:7px 11px}
 }
-.bubble.playing .say-line{border-color:var(--red);box-shadow:0 0 0 2px #f2d6d2}
+.bubble.playing .say-line{border-color:var(--red);box-shadow:0 0 0 2px var(--mint)}

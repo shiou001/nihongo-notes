@@ -25,7 +25,7 @@ async function app(hash = '#/') {
     Voice: { onVoicesChanged() {}, speak() {}, voices: () => [], get: () => ({}) },
   });
   ctx.window = ctx;
-  const scripts = ['data/content.js', 'data/external.js', 'data/life.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/app.js'];
+  const scripts = ['data/content.js', 'data/external.js', 'data/life.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/art.js', 'js/app.js'];
   for (const f of scripts) vm.runInContext(await readFile(new URL(f, root), 'utf8'), ctx, { filename: f });
   events.DOMContentLoaded();
   return { ctx, document,
@@ -39,6 +39,17 @@ test('今日、課程、單元、複習、參考資料、筆記、測驗設定�
   const a = await app();
   assert.match(a.document.querySelector('main').textContent, /今日練習/);
   assert.match(a.document.querySelector('main').textContent, /目前學習單元/);
+  // v0.11 首頁：大圖、跑馬燈、四個編號區段、每頁有英文大標題
+  assert.ok(a.document.querySelector('.home-hero .hero-title'));
+  assert.equal(a.document.querySelectorAll('.home-sec .sec-no').length, 4);
+  assert.ok(a.document.querySelector('.marquee[aria-hidden="true"]'));
+  assert.ok(a.document.querySelector('.home-hero svg.hero-art .walker'), '插畫與角色');
+  assert.match(a.document.querySelector('.hero-badge .ring').getAttribute('aria-label'), /N5 達成率 [0-9]+%/);
+  a.route('#/review');
+  assert.equal(a.document.querySelector('.page-head .display-en').textContent, 'Review');
+  a.route('#/unit/N5-greetings');
+  assert.match(a.document.querySelector('.page-head .display-en').textContent, /^Unit [0-9]+$/);
+  a.route('#/');
   for (const hash of ['#/map', '#/course/N4', '#/unit/N5-particles', '#/unit/N5-vocab-1', '#/unit/N5-kanji-1', '#/review', '#/reference', '#/notes/3', '#/quiz', '#/kana', '#/kanji/N5']) {
     a.route(hash);
     assert.ok(a.document.querySelector('main').textContent.length > 100, hash);
@@ -158,7 +169,7 @@ test('生活日本：總覽、主題單元的對話、文化小問答、今日�
   assert.match(main().querySelector('.fresh-note').textContent, /言葉/, 'Notion 新筆記提醒');
 
   a.route('#/life');
-  assert.equal(a.document.querySelector('nav.top a.active').textContent.trim(), '和生活日本');
+  assert.equal(a.document.querySelector('nav.top a.active').textContent.trim(), '生活日本');
   assert.equal(main().querySelectorAll('.life-card').length, a.ctx.NIHONGO_LIFE.topics.length);
   a.route('#/life/' + encodeURIComponent('食物'));
   assert.ok(main().querySelectorAll('.life-card').length >= 2 && [...main().querySelectorAll('.life-card .tag')].some(t => t.textContent === '食物'));
