@@ -26,8 +26,8 @@ window.Art = (() => {
   function hill() {
     const g = 'g' + (++uid);
     return `<svg class="hill-art" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true"><defs>${grainFilter(g)}</defs>
-      <path d="M0 90 Q360 20 720 60 Q1080 100 1440 40 L1440 220 L0 220Z" fill="#33684e"/>
-      <path d="M0 90 Q360 20 720 60 Q1080 100 1440 40 L1440 220 L0 220Z" fill="#33684e" filter="url(#${g})" opacity=".5"/></svg>`;
+      <path d="M0 90 Q360 20 720 60 Q1080 100 1440 40 L1440 220 L0 220Z" style="fill:var(--hill,#33684e)"/>
+      <path d="M0 90 Q360 20 720 60 Q1080 100 1440 40 L1440 220 L0 220Z" style="fill:var(--hill,#33684e)" filter="url(#${g})" opacity=".5"/></svg>`;
   }
 
   // 圓形進度（像徽章）：pct 0–100
