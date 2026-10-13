@@ -7,11 +7,12 @@
   --paper:#fff8f6; --paper-2:#ffeef1; --cream:#ffffff; --sand:#ffe3ea;
   --line:#f1d3da; --line-2:#e8bcc7;
   --sakura:#f6a5b8; --sakura-soft:#ffe3ea; --sakura-deep:#b8395f;
-  --butter:#ffd86b; --butter-soft:#fff3c8;
+  /* 副色：海鹽灰藍（變數名稱沿用 butter，避免大改） */
+  --butter:#b6c8de; --butter-soft:#eaf0f7;
   /* 舊的綠色變數全部改指向櫻花／奶油色 */
   --green:var(--sakura-deep); --green-deep:#962c4d; --sage:var(--sakura); --mint:var(--sakura-soft);
   --yellow:var(--butter); --yellow-soft:var(--butter-soft); --red:var(--sakura-deep);
-  --good:#6b4f00; --good-soft:var(--butter-soft); --bad:#a8324a; --bad-soft:#ffdfe4;
+  --good:#2c4a6e; --good-soft:var(--butter-soft); --bad:#a8324a; --bad-soft:#ffdfe4;
   --stroke:2.5px solid var(--ink); --pop:4px 4px 0 var(--ink); --pop-sm:3px 3px 0 var(--ink); --pop-lg:6px 6px 0 var(--ink);
   --font-round:'Zen Maru Gothic','Noto Sans TC',system-ui,sans-serif;
   --font-serif:var(--font-round);
@@ -123,7 +124,7 @@ a.play-card:hover,.life-card:hover,a.card.ref:hover,.activity:hover{transform:ro
 .next-lessons a:hover{background:var(--sakura-soft);padding-left:18px;transform:translate(-1px,-1px);box-shadow:var(--pop)}
 .next-lessons .ph-icon{color:var(--ink)}
 .next-title{font-family:var(--font-round);font-weight:700}
-.phrase-day{background:var(--butter-soft);border-color:var(--ink)}
+.phrase-day{background:var(--sakura-soft);border-color:var(--ink)}
 .life-next{background:var(--sakura-soft);border-color:var(--ink)}
 .game-next{background:#fff;border-color:var(--ink)}
 .play-card,a.play-card{border:var(--stroke);box-shadow:var(--pop)}
