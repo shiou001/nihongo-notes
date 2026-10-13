@@ -127,8 +127,61 @@ function col(headers, ...names) {
   return -1;
 }
 
+// ---------- 通用對照表：上面的規則都認不得的表格，退而求其次出「意思題」和「變換題」 ----------
+// 日文欄：六成以上的格子有假名，而且至少一格有兩個假名以上。
+// 「い形容詞／な形容詞／動詞」這種說明欄每格最多一個假名，不算日文。
+const KANA_RE = /[ぁ-ゖァ-ヺー]/g;
+const kanaCount = s => (stripInline(s).match(KANA_RE) || []).length;
+const isRomajiCell = s => /^[\x20-\x7e～〜ー]+$/.test(stripInline(s));
+const MEANING_HEAD = /意思|中文|翻譯/;
+// 「食べる とき」→「食べた とき」這種同一列互相變換的欄位：開頭相同、又不是互相包含
+// （「です」配「学生です。」是句型配例句，不是變換）
+function sameStem(a, b) {
+  a = stripInline(a).replace(/\s+/g, ''); b = stripInline(b).replace(/\s+/g, '');
+  return !!a && !!b && a[0] === b[0] && a !== b && !a.includes(b) && !b.includes(a);
+}
+const columnIs = (rows, i, test) => {
+  const cells = rows.map(r => r[i]).filter(c => stripInline(c || ''));
+  return cells.length > 0 && cells.filter(test).length / cells.length >= 0.6;
+};
+export function tableDrills(table) {
+  const H = table.headers, rows = table.rows;
+  if (!H.length || H.some(h => !h) || rows.length < 2) return [];
+  const isJpCol = i => columnIs(rows, i, c => kanaCount(c) >= 1) && rows.some(r => kanaCount(r[i] || '') >= 2);
+  const jp = H.map((_, i) => i).filter(i => !MEANING_HEAD.test(H[i]) && isJpCol(i) && !columnIs(rows, i, isRomajiCell));
+  const out = [];
+  const z = H.findIndex(h => MEANING_HEAD.test(h));
+  if (z >= 0 && jp.length) {
+    const j = [...jp].reverse().find(i => i < z) ?? jp[0];   // 意思欄左邊最近的日文欄
+    for (const r of rows) {
+      const prompt = stripInline(r[j] || ''), answer = stripInline(r[z] || '');
+      if (prompt && answer) out.push({ kind: 'meaning', prompt, answer, from: H[j], ask: '意思' });
+    }
+  }
+  for (let k = 0; k + 1 < jp.length; k++) {
+    const a = jp[k], b = jp[k + 1];
+    if (rows.filter(r => sameStem(r[a] || '', r[b] || '')).length / rows.length < 0.6) continue;
+    for (const r of rows) {
+      const prompt = stripInline(r[a] || ''), answer = stripInline(r[b] || '');
+      if (sameStem(prompt, answer)) out.push({ kind: 'transform', prompt, answer, from: H[a], ask: H[b] });
+    }
+  }
+  return out;
+}
+
+// 下面 extractLearningData 的專用規則認得這張表嗎？（條件要和那邊一致）
+function classify({ headers: H }) {
+  const im = col(H, '意思'), ipat = col(H, '句型', '疑問詞', '助詞');
+  return (col(H, '單字') >= 0 && col(H, '讀音') >= 0 && im >= 0)
+    || (col(H, '羅馬拼音') >= 0 && col(H, '平假名') >= 0 && col(H, '片假名') >= 0)
+    || (ipat >= 0 && (im >= 0 || col(H, '用途') >= 0))
+    || (col(H, '原形') >= 0 && im >= 0 && H.length >= 3)
+    || (col(H, '日語') >= 0 && col(H, '中文', '使用場合') >= 0)
+    || (col(H, '項目') >= 0 && col(H, '說明') >= 0);
+}
+
 export function extractLearningData(pages) {
-  const vocab = [], grammar = [], phrases = [], kana = [];
+  const vocab = [], grammar = [], phrases = [], kana = [], drills = [];
   const seen = new Set();
   const add = (arr, type, key, obj) => {
     const id = type + '_' + hashId(key);
@@ -145,6 +198,15 @@ export function extractLearningData(pages) {
       else { h3 = sec.heading; level = levelOf(sec.heading) || level; }
       const source = h3 ? `${h2} › ${h3}` : h2;
 
+      sec.blocks.forEach((b, bi) => {
+        if (b.type !== 'table') return;
+        if (!classify(b)) {
+          const section = `${page.title} › ${source}`, group = `${section}#${bi}`;
+          for (const d of tableDrills(b)) {
+            add(drills, 'd', `${d.kind}|${d.prompt}|${d.answer}`, { ...d, level: level || undefined, group, section, source: section });
+          }
+        }
+      });
       for (const b of sec.blocks) {
         if (b.type !== 'table') continue;
         const H = b.headers;
@@ -224,7 +286,7 @@ export function extractLearningData(pages) {
       }
     }
   }
-  return { vocab, grammar, phrases, kana };
+  return { vocab, grammar, phrases, kana, drills };
 }
 
 export function buildContent(pageMarkdowns, syncedAt = new Date().toISOString()) {

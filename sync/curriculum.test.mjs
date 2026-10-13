@@ -8,10 +8,10 @@ async function engine() {
   const store = {};
   const w = { localStorage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: k => { delete store[k]; } } };
   w.window = w;
-  for (const f of ['data/content.js', 'data/external.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'js/progress.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js']) {
+  for (const f of ['data/content.js', 'data/external.js', 'data/life.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'js/progress.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js']) {
     new Function('window', 'localStorage', 'Progress', 'Quiz', await readFile(new URL('../' + f, import.meta.url), 'utf8'))(w, w.localStorage, w.Progress, w.Quiz);
     // 讓後面的檔案看得到前面定義的全域
-    for (const k of ['Progress', 'Quiz', 'Curriculum', 'KanjiAlign', 'NIHONGO_DATA', 'NIHONGO_KANJI', 'NIHONGO_EXTERNAL', 'NIHONGO_CURRICULUM']) if (w[k]) globalThis[k] = w[k];
+    for (const k of ['Progress', 'Quiz', 'Curriculum', 'KanjiAlign', 'NIHONGO_DATA', 'NIHONGO_KANJI', 'NIHONGO_EXTERNAL', 'NIHONGO_CURRICULUM', 'NIHONGO_LIFE']) if (w[k]) globalThis[k] = w[k];
   }
   return w;
 }
@@ -82,4 +82,27 @@ test('純閱讀單元：按「我讀完了」才算完成；漢字課的題目�
   const qs = Q.buildQuestions(C.quizOpts(k, { count: 50 }));
   assert.ok(qs.length >= 12 && qs.every(q => q.type.startsWith('kanji')));
   assert.ok(qs.every(q => ids.includes(q.id)));
+});
+
+test('Notion 新段落自動變成單元；連體修飾、生活主題排進課程', async () => {
+  const w = await engine(), C = w.Curriculum;
+  const fresh = C.freshUnits();
+  assert.ok(fresh.some(u => u.title.includes('言葉') && u.level === 'N5' && u.items.vocab.length >= 5), '言葉相關單字');
+  assert.ok(fresh.every(u => u.auto === 'notes' && C.get(u.key) === u));
+  // 大綱寫到的段落不會再自動產生
+  assert.ok(!fresh.some(u => u.title.includes('連體修飾')));
+  const r = C.get('N5-rentai');
+  const types = C.quizOpts(r).types;
+  assert.ok(types.includes('drill_transform') && types.includes('drill_meaning'), types.join());
+  assert.ok(C.questionIds(r).length >= 15);
+  // 生活主題：每兩個單元插一個，不會連在一起
+  for (const level of ['N5', 'N4']) {
+    const list = C.all(level), life = list.filter(u => u.auto === 'life');
+    assert.equal(life.length, w.NIHONGO_LIFE.topics.filter(t => t.level === level).length);
+    assert.ok(life.every(u => u.items.vocab.length >= 8 && u.items.phrases.length >= 4 && C.questionIds(u).length >= 12));
+    assert.ok(list.every((u, i) => !(u.auto === 'life' && list[i + 1]?.auto === 'life')), level + ' 生活主題連在一起');
+  }
+  // 生活主題的單字不重複出現在單字課
+  const lifeOnly = new Set(C.all('N5').filter(u => u.auto === 'life').flatMap(u => u.items.vocab.filter(v => v.origin === 'life').map(v => v.id)));
+  assert.ok(C.all('N5').filter(u => u.auto === 'vocab').every(u => u.items.vocab.every(v => !lifeOnly.has(v.id))));
 });

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parsePageMarkdown, buildContent, stripInline } from './parse-notion-md.mjs';
+import { parsePageMarkdown, buildContent, stripInline, tableDrills } from './parse-notion-md.mjs';
 import { richText, absoluteHref } from './notion-richtext.mjs';
 
 const cacheDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cache');
@@ -101,4 +101,27 @@ test('表格裡帶連結的單字，進測驗時是乾淨的文字', () => {
   assert.equal(c.vocab[0].word, '水');
   assert.equal(c.vocab[0].meaning, '水');
   assert.equal(c.vocab[0].level, 'N5');
+});
+
+test('通用對照表：意思題與變換題（連體修飾），句型配例句不當變換題', () => {
+  const T = (headers, rows) => ({ type: 'table', headers, rows });
+  const past = tableDrills(T(['現在', '過去', '意思（過去）'], [['食べる とき', '食べた とき', '吃的時候'], ['寒い 一日', '寒かった 一日', '寒冷的一天']]));
+  assert.deepEqual(past.filter(d => d.kind === 'transform').map(d => [d.prompt, d.answer, d.ask]), [['食べる とき', '食べた とき', '過去'], ['寒い 一日', '寒かった 一日', '過去']]);
+  assert.deepEqual(past.filter(d => d.kind === 'meaning').map(d => [d.prompt, d.answer]), [['食べた とき', '吃的時候'], ['寒かった 一日', '寒冷的一天']]);
+  // 「い形容詞」只有一個假名，算中文說明；只有一欄日文就沒有變換題
+  const kinds = tableDrills(T(['詞類', '例子', '意思'], [['い形容詞', '寒い 一日', '寒冷的一天'], ['な形容詞', '好きな 人', '喜歡的人']]));
+  assert.deepEqual(kinds.map(d => d.kind), ['meaning', 'meaning']);
+  // 句尾配例句是包含關係，不是變換
+  assert.equal(tableDrills(T(['語氣', '句尾', '例子'], [['肯定', 'です', '学生です。'], ['疑問', 'ですか', '学生ですか。']])).length, 0);
+  // 羅馬拼音欄不算日文；表頭空白（比較表）不出題
+  assert.equal(tableDrills(T(['例字', '讀音', '意思'], [['がっこう', 'gakkou', '學校'], ['ざっし', 'zasshi', '雜誌']])).filter(d => d.from === '讀音').length, 0);
+  assert.equal(tableDrills(T(['', 'いただきます', 'ごちそうさまでした'], [['時機', '飯前', '飯後'], ['意思', '開動', '吃飽']])).length, 0);
+});
+
+test('真實筆記：連體修飾段落的五張表都會出題，專用規則認得的表不重複出', () => {
+  const rentai = content.drills.filter(d => d.source.includes('連體修飾'));
+  assert.ok(rentai.filter(d => d.kind === 'transform').length >= 6, '變換題 ' + rentai.length);
+  assert.ok(rentai.some(d => d.prompt === '母が買った果物を食べました。' && d.answer === '母の買った果物を食べました。'));
+  assert.ok(content.drills.every(d => d.id.startsWith('d_') && d.prompt && d.answer && d.group));
+  assert.ok(!content.drills.some(d => d.source.includes('單字分級')), '單字表交給單字規則');
 });

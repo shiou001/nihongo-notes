@@ -10,7 +10,12 @@
   const rich = s => esc(String(s ?? '').replace(/^[\s\p{Extended_Pictographic}\uFE0F\u200D]+/u, '')).replace(/\*\*(.+?)\*\*/g, '<b class="hl">$1</b>').replace(/\[(.+?)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
   const titleText = s => String(s || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').trim();
   const icon = n => `<span class="ph-icon" data-icon="${n}" aria-hidden="true"></span>`;
-  const kindIcon = kind => icon(({ 假名: 'text-aa', 發音: 'speaker-high', 會話: 'notebook', 文法: 'pencil-simple', 單字: 'book-open', 閱讀: 'book-open', 漢字: 'translate' })[kind] || 'book-open');
+  const kindIcon = kind => kind === '生活' ? glyph('和', 'tiny') : icon(({ 假名: 'text-aa', 發音: 'speaker-high', 會話: 'notebook', 文法: 'pencil-simple', 單字: 'book-open', 閱讀: 'book-open', 漢字: 'translate', 筆記: 'notebook' })[kind] || 'book-open');
+  // 生活日本的主題字（食、動、旅、季）：用漢字當圖示，順便認字
+  const LIFE = () => window.NIHONGO_LIFE || { themes: {}, topics: [] };
+  const THEME_CLASS = { 食物: 'food', 動畫: 'anime', 旅遊: 'travel', 季節: 'season' };
+  const glyph = (ch, cls = '') => `<span class="glyph ${cls}" aria-hidden="true" lang="ja">${esc(ch)}</span>`;
+  const themeGlyph = (theme, cls = '') => glyph(LIFE().themes[theme]?.glyph || '和', `${THEME_CLASS[theme] || ''} ${cls}`);
   const doodle = n => icon(({ onigiri: 'cards', cloud: 'chart-line', star: 'check-circle', torii: 'calendar-blank' })[n] || 'book-open');
   const fmtDate = iso => { try { return new Date(iso).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
 
@@ -45,13 +50,13 @@
   function lessonActions(page) {
     const level = Study.profile().level;
     if (page.title.includes('五十音') || page.title.includes('發音')) return '<a class="btn small" href="#/kana">聽讀五十音</a><a class="btn small" href="#/quiz?types=kana">練習假名</a>';
-    const sources = [...DATA().vocab, ...DATA().grammar, ...DATA().phrases].filter(x => x.source?.startsWith(page.title + ' › '));
+    const sources = [...DATA().vocab, ...DATA().grammar, ...DATA().phrases, ...(DATA().drills || [])].filter(x => x.source?.startsWith(page.title + ' › '));
     return sources.length ? `<a class="btn small" href="#/quiz?page=${encodeURIComponent(page.title)}&levels=all">練習本頁內容</a>` : `<a class="btn small" href="#/quiz?levels=${level}">練習 ${level} 單字</a>`;
   }
   // 全站到期的題目數（不含單元的「已讀」標記）
   function dueCount(now = Date.now()) {
     const d = DATA();
-    const active = new Set([...d.vocab, ...d.grammar, ...d.phrases, ...d.kana, ...(d.kanjiWords || [])].map(x => x.id));
+    const active = new Set([...d.vocab, ...d.grammar, ...d.phrases, ...d.kana, ...(d.drills || []), ...(d.kanjiWords || [])].map(x => x.id));
     for (const k of d.kanji || []) {
       if (k.on?.length) active.add(k.id + ':on');
       if (k.kun?.length) active.add(k.id + ':kun');
@@ -63,8 +68,8 @@
     const st = Curriculum.stats(u);
     const meta = u.readOnly ? (st.read ? '已讀' : '純閱讀') : `${st.learned}/${st.total} 已學`;
     return `<li class="${st.status} ${cur && cur.key === u.key ? 'current' : ''}"><a href="#/unit/${esc(u.key)}">
-      <span class="u-num">${u.index}</span><span class="u-kind tag">${kindIcon(u.kind)} ${esc(u.kind)}</span>
-      <span class="u-title">${esc(u.title)}${u.desc ? `<small>${esc(u.desc)}</small>` : ''}</span>
+      <span class="u-num">${u.index}</span><span class="u-kind tag ${u.auto === 'life' ? 'life ' + (THEME_CLASS[u.theme] || '') : ''}">${u.auto === 'life' ? themeGlyph(u.theme, 'tiny') : kindIcon(u.kind)} ${esc(u.auto === 'life' ? u.theme : u.kind)}</span>
+      <span class="u-title">${esc(u.title)}${u.fresh ? ' <span class="tag fresh">Notion 新筆記</span>' : ''}${u.desc ? `<small>${esc(u.desc)}</small>` : ''}</span>
       <span class="u-meta">${meta}</span><span class="u-status" aria-label="${st.status}">${STATUS_ICON[st.status]}</span></a></li>`;
   }
 
@@ -89,6 +94,7 @@
       </div>
       <div class="lesson-info"><h2>${unit.title.startsWith(profile.level) ? '' : profile.level + ' '}${esc(unit.title)}</h2><div class="lesson-progress"><div class="bar" role="progressbar" aria-label="目前單元學習進度" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100"><div class="fill" style="width:${st.pct}%"></div></div><span class="meta">${unit.readOnly ? st.read ? '已讀完' : '尚未讀完' : `${st.learned} / ${st.total} 項已學`}</span></div><p class="meta lesson-desc">${esc(unit.desc)}</p><a class="text-link" href="#/unit/${esc(unit.key)}">繼續單元 ${icon('arrow-right')}</a></div>
     </section>` : '<section class="card"><h2>這一級還沒有課程</h2><a href="#/course">探索其他等級</a></section>'}
+    ${todayExtras(profile.level, unit)}
     <section class="upcoming"><div class="section-heading"><h2>接下來的學習內容</h2><a class="text-link" href="#/course/${profile.level}">查看全部課程 ${icon('arrow-right')}</a></div>
       ${upcoming.length ? `<ol class="next-lessons">${upcoming.map(u => `<li><a href="#/unit/${esc(u.key)}">${icon('book-open')}<span class="next-title">${esc(u.title)}</span><span class="meta next-desc">${esc(u.desc)}</span>${icon('arrow-right')}</a></li>`).join('')}</ol>` : '<p class="meta">這一級已走到最後一個單元。繼續複習，讓學過的內容留下來。</p>'}
     </section>`;
@@ -122,11 +128,9 @@
 
   // ────────────────────────────── 單元 ──────────────────────────────
   function unitReadHtml(u) {
+    if (u.auto === 'life') return lifeReadHtml(u);
     if (u.auto === 'vocab') {
-      return `<article class="card unit-read"><h2>本課單字 <small>${u.items.vocab.length} 個</small></h2><p class="meta">先讀一遍，點發音按鈕聽發音，再遮住意思回想。</p>
-        <div class="tablewrap"><table class="vocab-table"><thead><tr><th>單字</th><th>讀音</th><th>意思</th><th></th></tr></thead><tbody>
-        ${u.items.vocab.map(v => `<tr><td lang="ja">${esc(v.word)}</td><td lang="ja">${esc(v.reading)}</td><td>${esc(v.meaning)}${v.ai ? ' <span class="tag">AI 翻譯</span>' : ''}</td><td><button class="btn tiny" data-say="${esc(v.reading || v.word)}"><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span></button></td></tr>`).join('')}
-        </tbody></table></div></article>`;
+      return `<article class="card unit-read"><h2>本課單字 <small>${u.items.vocab.length} 個</small></h2><p class="meta">先讀一遍，點發音按鈕聽發音，再遮住意思回想。</p>${vocabTable(u.items.vocab)}</article>`;
     }
     if (u.auto === 'kanji') {
       const A = window.KanjiAlign;
@@ -150,7 +154,7 @@
     return `
     <section class="page-head">
       <p class="meta"><a href="#/course/${u.level}"> ${u.level} 課程</a> › 第 ${u.index} / ${u.total} 單元</p>
-      <h1><span class="tag">${kindIcon(u.kind)} ${esc(u.kind)}</span> ${esc(u.title)}</h1>
+      <h1><span class="tag">${u.auto === 'life' ? `${themeGlyph(u.theme, 'tiny')} 生活日本・${esc(u.theme)}` : `${kindIcon(u.kind)} ${esc(u.kind)}`}</span>${u.fresh ? ' <span class="tag fresh">Notion 新筆記</span>' : ''} ${esc(u.title)}</h1>
       ${u.desc ? `<p class="lead">${esc(u.desc)}</p>` : ''}
     </section>
     <section class="card tape">
@@ -160,6 +164,7 @@
         ${u.readOnly ? (st.read ? '' : `<button class="btn primary" id="mark-read" data-unit="${esc(u.key)}"> 我讀完了</button>`) : `<a class="btn primary" href="#/quiz?unit=${esc(u.key)}"> 練習這個單元 <small>${st.total} 項</small></a>${st.weak ? `<a class="btn" href="#/quiz?unit=${esc(u.key)}&weak=1">只練弱點 (${st.weak})</a>` : ''}`}
         ${u.kana.length ? '<a class="btn" href="#/kana"> 聽五十音</a>' : ''}
       </div>
+      ${activityRow(u)}
     </section>
     <h2 class="unit-h"> 讀</h2>
     ${unitReadHtml(u)}
@@ -167,6 +172,251 @@
       ${prev ? `<a class="btn small" href="#/unit/${esc(prev.key)}">← 第 ${prev.index} 單元：${esc(prev.title)}</a>` : ''}
       ${next ? `<a class="btn small" href="#/unit/${esc(next.key)}">第 ${next.index} 單元：${esc(next.title)} →</a>` : '<span class="meta">這是最後一個單元 </span>'}
     </div>`;
+  }
+
+  // ────────────────────────────── 換個方式練：活動列 ──────────────────────────────
+  const buildItems = u => u.items.phrases.filter(p => p.parts?.length >= 2);
+  function activities(u) {
+    if (u.readOnly) return [];
+    const key = encodeURIComponent(u.key), out = [];
+    if (Curriculum.pairs(u).length >= 4) out.push({ href: `#/play/match?unit=${key}`, icon: 'cards-three', title: '配對遊戲', desc: '把日文和意思連起來，挑戰最快紀錄' });
+    if (u.items.vocab.filter(v => v.reading && v.reading !== v.word).length >= 4) out.push({ href: `#/quiz?unit=${key}&types=listen`, icon: 'speaker-high', title: '聽力挑戰', desc: '只聽發音，選出是哪個字' });
+    if (buildItems(u).length) out.push({ href: `#/play/build?unit=${key}`, icon: 'pencil-simple', title: '句子重組', desc: '把字卡排成正確的句子' });
+    if (u.topic?.dialogue) out.push({ href: `#/play/role?unit=${key}`, icon: 'notebook', title: '角色扮演', desc: `你演「${u.topic.dialogue.roles.B}」，選出該說的話` });
+    return out;
+  }
+  function activityRow(u) {
+    const a = activities(u);
+    return a.length ? `<div class="activity-row"><p class="meta">換個方式練</p><div class="activity-grid">${a.map(x => `<a class="activity" href="${x.href}">${icon(x.icon)}<span><b>${esc(x.title)}</b><small>${esc(x.desc)}</small></span></a>`).join('')}</div></div>` : '';
+  }
+
+  // ────────────────────────────── 生活日本 ──────────────────────────────
+  const vocabTable = vs => `<div class="tablewrap" tabindex="0" role="region" aria-label="單字表，可左右捲動"><table class="vocab-table"><thead><tr><th>單字</th><th>讀音</th><th>意思</th><th></th></tr></thead><tbody>
+    ${vs.map(v => `<tr><td lang="ja">${esc(v.word)}</td><td lang="ja">${esc(v.reading)}</td><td>${esc(v.meaning)}${v.ai ? ' <span class="tag">AI 翻譯</span>' : ''}</td><td><button class="btn tiny" data-say="${esc(v.reading || v.word)}">${icon('speaker-high')}</button></td></tr>`).join('')}
+    </tbody></table></div>`;
+  function dialogueHtml(t) {
+    const d = t.dialogue;
+    return `<article class="card dialogue" data-topic="${esc(t.id)}">
+      <div class="section-heading"><h2>情境對話 <small>${esc(d.scene)}</small></h2>
+        <div class="actions"><button class="btn small" data-play-dialogue="${esc(t.id)}">${icon('play')} 播放整段</button><button class="btn small" data-toggle-zh aria-pressed="false">顯示中文</button></div></div>
+      <ol class="bubbles">${d.lines.map(([who, jp, zh], i) => `<li class="bubble ${who === 'B' ? 'me' : ''}" data-line="${i}"><span class="who">${esc(d.roles[who] || who)}</span><button class="say-line" data-say="${esc(jp)}" data-voice-role="${who}"><span lang="ja">${esc(jp)}</span></button><span class="zh" hidden>${esc(zh)}</span></li>`).join('')}</ol>
+      <p class="meta">點任何一句可以單獨聽。熟了之後，用上面的「角色扮演」自己演一次。</p>
+    </article>`;
+  }
+  function triviaHtml(t) {
+    return `<article class="card trivia"><h2>文化小問答</h2><p class="meta">看看你對日本生活了解多少。這裡不算進複習排程，答錯也沒關係。</p>
+      ${t.quiz.map((q, qi) => `<div class="trivia-q" data-trivia="${esc(t.id)}:${qi}"><p><b>${qi + 1}.</b> ${esc(q.q)}</p><div class="trivia-choices">${q.choices.map((c, ci) => `<button class="btn small" data-trivia-choice="${ci}">${esc(c)}</button>`).join('')}</div><p class="trivia-explain" role="status" hidden></p></div>`).join('')}
+    </article>`;
+  }
+  function lifeReadHtml(u) {
+    const t = u.topic, th = LIFE().themes[t.theme] || {};
+    return `
+    <article class="card life-intro ${THEME_CLASS[t.theme] || ''}">
+      <div class="life-head">${themeGlyph(t.theme, 'big')}<div><p class="eyebrow">${esc(th.label || t.theme)}・${esc(th.note || '')}</p><h2>${esc(t.title)}</h2></div></div>
+      ${(t.intro || []).map(p => `<p>${esc(p)}</p>`).join('')}
+      ${t.tips?.length ? `<h3>小知識</h3><ul class="tips">${t.tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    </article>
+    ${t.dialogue ? dialogueHtml(t) : ''}
+    <article class="card unit-read"><h2>這個主題的單字 <small>${u.items.vocab.length} 個</small></h2>${vocabTable(u.items.vocab)}</article>
+    ${u.items.phrases.length ? `<article class="card unit-read"><h2>實用句</h2><ul class="phrase-list">${u.items.phrases.map(p => `<li><button class="btn tiny" data-say="${esc(p.jp)}">${icon('speaker-high')}</button><span lang="ja">${esc(p.jp)}</span><span class="meta">${esc(p.zh)}</span></li>`).join('')}</ul></article>` : ''}
+    ${t.quiz?.length ? triviaHtml(t) : ''}`;
+  }
+  function viewLife(theme = '') {
+    const L = LIFE(), themes = Object.keys(L.themes || {});
+    if (!themes.includes(theme)) theme = '';
+    const topics = L.topics.filter(t => !theme || t.theme === theme);
+    const card = t => {
+      const u = Curriculum.get(`${t.level}-life-${t.id}`), st = u ? Curriculum.stats(u) : null;
+      return `<a class="life-card ${THEME_CLASS[t.theme] || ''}" href="#/unit/${esc(u?.key || '')}">
+        <span class="life-card-top">${themeGlyph(t.theme, 'big')}<span class="life-meta"><span class="tag">${esc(t.theme)}</span><span class="tag">${esc(t.level)}${u ? ` 第 ${u.index} 單元` : ''}</span></span></span>
+        <b>${esc(t.title)}</b><small>${esc(t.desc)}</small>
+        ${st ? `<span class="bar"><span class="fill" style="width:${st.pct}%"></span></span><span class="meta">${st.done ? '已達標' : `${st.learned} / ${st.total} 已學`}</span>` : ''}</a>`;
+    };
+    return `
+    <section class="page-head"><h1>${glyph('和', 'title')} 生活日本</h1>
+      <p class="lead">吃拉麵、搭電車、看動畫、逛神社。每個主題是一個單元，也穿插在課程裡：讀文化小知識、聽情境對話、玩角色扮演；學到的單字和句子會進複習排程。</p>
+      <div class="actions">${['', ...themes].map(th => `<a class="btn small ${th === theme ? 'primary' : ''}" href="#/life${th ? '/' + encodeURIComponent(th) : ''}">${th ? themeGlyph(th, 'tiny') + ' ' + esc(th) : '全部主題'}</a>`).join('')}</div>
+    </section>
+    <div class="life-grid">${topics.map(card).join('')}</div>
+    <section class="card"><h2>想加自己的主題？</h2>
+      <p>最簡單的方式是寫在 Notion：在「詞彙整理」新增一段，例如「## 動畫《○○》學到的單字」，放一張「單字／讀音／意思」表格；句子用「日語／中文」表格。隔天同步後，它會自動變成課程裡的「Notion 新筆記」單元。</p>
+      <p class="meta">想要有對話、小問答的完整主題，可以在 <code>data/life.js</code> 照現有格式新增。</p>
+    </section>`;
+  }
+
+  // ────────────────────────────── 小遊戲：配對、句子重組、角色扮演 ──────────────────────────────
+  const game = { kind: '' };
+  const shuffleArr = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const GAME_KEY = 'nihongo.games';
+  const bestTimes = () => { try { return JSON.parse(localStorage.getItem(GAME_KEY)) || {}; } catch { return {}; } };
+  // 回傳 { best, prev }：prev 是這次之前的最快紀錄（沒有就是 undefined）
+  function saveBest(key, ms) {
+    const b = bestTimes(), prev = b[key];
+    if (!prev || ms < prev) { b[key] = ms; try { localStorage.setItem(GAME_KEY, JSON.stringify(b)); } catch {} }
+    return { best: Math.min(ms, prev || Infinity), prev };
+  }
+  const gameTop = (ic, label, right) => `<div class="quiz-top"><span class="tag">${icon(ic)} ${label}</span><span class="meta">${esc(game.u.title)}</span><span class="score">${right}</span></div>`;
+  const gameEnd = kind => `<div class="actions"><button class="btn primary" data-replay="${kind}">再玩一次</button><a class="btn" href="#/unit/${esc(game.u.key)}">回到單元</a>${game.u.readOnly ? '' : `<a class="btn" href="#/quiz?unit=${esc(game.u.key)}">練習這個單元</a>`}</div>`;
+
+  // 配對：左邊日文、右邊意思。第一次就配對成功的算一次答對（最後一組靠刪去法，不算）
+  function startMatch(u) {
+    const all = shuffleArr(Curriculum.pairs(u)).sort((a, b) => (Progress.stat(a.id).streak > 0) - (Progress.stat(b.id).streak > 0));
+    const pairs = all.slice(0, 6);
+    Object.assign(game, { kind: 'match', u, pairs, left: shuffleArr(pairs), right: shuffleArr(pairs), sel: null, done: new Set(), missed: new Set(), mistakes: 0, firstTry: 0, start: Date.now() });
+    renderMatch();
+  }
+  function renderMatch(msg = '') {
+    const g = game;
+    app().innerHTML = `<section class="game">
+      ${gameTop('cards-three', '配對遊戲', `${g.done.size} / ${g.pairs.length}・失誤 ${g.mistakes}`)}
+      <p class="meta">先點左邊的日文（會唸給你聽），再點右邊對應的意思。第一次就配對成功的，會算進單元進度。</p>
+      <div class="match-board">
+        <div class="match-col">${g.left.map(p => `<button class="mcard ${g.done.has(p.id) ? 'done' : ''} ${g.sel === p.id ? 'sel' : ''}" data-match="L" data-id="${esc(p.id)}" ${g.done.has(p.id) ? 'disabled' : ''} aria-pressed="${g.sel === p.id}"><span lang="ja">${esc(p.jp)}</span>${p.sub ? `<small lang="ja">${esc(p.sub)}</small>` : ''}</button>`).join('')}</div>
+        <div class="match-col">${g.right.map(p => `<button class="mcard ${g.done.has(p.id) ? 'done' : ''}" data-match="R" data-id="${esc(p.id)}" ${g.done.has(p.id) ? 'disabled' : ''}>${esc(p.zh)}</button>`).join('')}</div>
+      </div>
+      <p id="feedback" class="meta" role="status" aria-live="polite">${esc(msg)}</p>
+    </section>`;
+  }
+  function matchClick(side, id) {
+    const g = game;
+    if (side === 'L') { g.sel = id; speak(g.pairs.find(p => p.id === id)?.say); return renderMatch(); }
+    if (!g.sel) return renderMatch('先點左邊的日文。');
+    if (id !== g.sel) {
+      g.mistakes++; g.missed.add(g.sel);
+      renderMatch('再想想看。');
+      [...document.querySelectorAll('[data-match="R"]')].find(b => b.dataset.id === id)?.classList.add('shake');
+      return;
+    }
+    g.done.add(id); g.sel = null;
+    const last = g.done.size === g.pairs.length;
+    if (!g.missed.has(id)) { g.firstTry++; if (!last) Progress.record(id, true); }
+    if (!last) return renderMatch('配對成功！');
+    const ms = Date.now() - g.start, rec = saveBest('match:' + g.u.key, ms);
+    Progress.endSession(g.firstTry, g.pairs.length, '配對遊戲');
+    app().innerHTML = `<section class="game result"><div class="card center">
+      <div class="result-mascot">${icon('cards-three')}</div><h1>${(ms / 1000).toFixed(1)} 秒</h1>
+      <p class="lead">${g.pairs.length} 組全部配對完成，失誤 ${g.mistakes} 次。</p>
+      <p>${!rec.prev ? '這是你的第一筆紀錄。' : ms < rec.prev ? '刷新最快紀錄！' : `最快紀錄 ${(rec.best / 1000).toFixed(1)} 秒`}</p>
+      ${gameEnd('match')}</div></section>`;
+  }
+
+  // 句子重組：把字卡排成整句。聽整句算提示
+  function startBuild(u) {
+    Object.assign(game, { kind: 'build', u, items: shuffleArr(buildItems(u)).slice(0, 5), i: 0, firstTry: 0 });
+    setupBuild();
+  }
+  function setupBuild() {
+    const it = game.items[game.i];
+    let pool = it.parts.map(t => ({ t }));
+    for (let n = 0; n < 6 && pool.map(p => p.t).join('') === it.jp; n++) pool = shuffleArr(pool);
+    Object.assign(game, { pool, picked: [], tried: false, usedHint: false, solved: false });
+    renderBuild();
+  }
+  function renderBuild(msg = '', ok = null) {
+    const g = game, it = g.items[g.i];
+    app().innerHTML = `<section class="game">
+      ${gameTop('pencil-simple', '句子重組', `一次答對 ${g.firstTry}`)}
+      <div class="bar"><div class="fill" style="width:${g.i / g.items.length * 100}%"></div></div>
+      <div class="card question">
+        <p class="sub">把字卡排成這句話（${g.i + 1} / ${g.items.length}）</p><p class="build-zh">${esc(it.zh)}</p>
+        <div class="build-line ${g.solved ? 'solved' : ''}" aria-label="你排的句子">${g.picked.length ? g.picked.map((p, n) => `<button class="tile on" data-build-remove="${n}" lang="ja" ${g.solved ? 'disabled' : ''}>${esc(p.t)}</button>`).join('') : '<span class="meta">點下面的字卡，照順序放上來</span>'}</div>
+        <div class="build-pool">${g.pool.map((p, n) => `<button class="tile" data-build-pick="${n}" lang="ja">${esc(p.t)}</button>`).join('')}</div>
+      </div>
+      <div class="actions">${g.solved ? `<button class="btn primary" id="build-next">${g.i + 1 < g.items.length ? '下一句 →' : '看結果'}</button>` : `<button class="btn primary" id="build-check" ${g.pool.length ? 'disabled' : ''}>確認</button><button class="btn" id="build-reset">全部放回</button>`}
+        <button class="btn" data-say="${esc(it.jp)}">${icon('speaker-high')} 聽整句${g.solved ? '' : '（提示）'}</button></div>
+      <div id="feedback" class="feedback" role="status" aria-live="polite">${msg ? `<div class="card ${ok ? 'good' : 'bad'}">${ok ? icon('check-circle') : icon('x')}<b>${esc(msg)}</b></div>` : ''}</div>
+    </section>`;
+  }
+  function checkBuild() {
+    const g = game, it = g.items[g.i];
+    if (g.picked.map(p => p.t).join('') === it.jp) {
+      g.solved = true;
+      if (!g.tried) { Progress.record(it.id, true, { assisted: g.usedHint }); if (!g.usedHint) g.firstTry++; }
+      speak(it.jp);
+      return renderBuild(`對了！${it.jp}`, true);
+    }
+    if (!g.tried) { g.tried = true; Progress.record(it.id, false); }
+    renderBuild('順序不太對。點上面的字卡可以放回去，再試一次。', false);
+  }
+  function finishBuild() {
+    const g = game;
+    Progress.endSession(g.firstTry, g.items.length, '句子重組');
+    app().innerHTML = `<section class="game result"><div class="card center"><div class="result-mascot">${icon('pencil-simple')}</div>
+      <h1>${g.firstTry} / ${g.items.length}</h1><p class="lead">一次就排對 ${g.firstTry} 句。</p><p>句子重組練的是語順：日文的動詞在最後，助詞跟在名詞後面。</p>${gameEnd('build')}</div></section>`;
+  }
+
+  // 角色扮演：你演 B。輪到你時從三句裡選出該說的話；對方的台詞會唸出來
+  // list: [[句子, 角色], ...]；onLine(i) 在開始唸第 i 句時呼叫（-1 表示唸完）
+  function speakQueue(list, onLine = () => {}) {
+    if (!window.Voice?.supported?.()) return;
+    let i = 0;
+    const next = () => {
+      if (i >= list.length) return onLine(-1);
+      onLine(i);
+      const [text, role] = list[i++]; const u = speak(text, role);
+      if (u) { u.onend = next; u.onerror = () => onLine(-1); }
+    };
+    next();
+  }
+  function startRole(u) {
+    Object.assign(game, { kind: 'role', u, d: u.topic.dialogue, i: 0, mistakes: 0, shown: [], options: null, logged: false });
+    advanceRole([]);
+  }
+  function roleOptions() {
+    const g = game, right = g.d.lines[g.i][1];
+    const mine = g.d.lines.filter(l => l[0] === 'B').map(l => l[1]);
+    const others = LIFE().topics.filter(t => t.id !== g.u.topic.id && t.dialogue).flatMap(t => t.dialogue.lines.filter(l => l[0] === 'B').map(l => l[1]));
+    const wrong = shuffleArr([...new Set([...mine, ...others])].filter(x => x !== right)).slice(0, 2);
+    return shuffleArr([right, ...wrong]);
+  }
+  function advanceRole(queue) {
+    const g = game;
+    while (g.i < g.d.lines.length && g.d.lines[g.i][0] !== 'B') { g.shown.push(g.i); queue.push([g.d.lines[g.i][1], 'A']); g.i++; }
+    g.options = g.i < g.d.lines.length ? roleOptions() : null;
+    renderRole();
+    speakQueue(queue);
+  }
+  function renderRole(msg = '') {
+    const g = game, d = g.d, total = d.lines.filter(l => l[0] === 'B').length;
+    const bubbles = g.shown.map(i => { const [who, jp, zh] = d.lines[i]; return `<li class="bubble ${who === 'B' ? 'me' : ''}"><span class="who">${esc(d.roles[who])}</span><button class="say-line" data-say="${esc(jp)}" data-voice-role="${who}"><span lang="ja">${esc(jp)}</span></button>${g.options ? '' : `<span class="zh">${esc(zh)}</span>`}</li>`; }).join('');
+    app().innerHTML = `<section class="game">
+      ${gameTop('notebook', '角色扮演', `失誤 ${g.mistakes}`)}
+      <p class="meta">場景：${esc(d.scene)}。你是「${esc(d.roles.B)}」，對方是「${esc(d.roles.A)}」。</p>
+      <div class="card dialogue"><ol class="bubbles">${bubbles}</ol>
+      ${g.options ? `<p class="sub">輪到你說：</p><div class="choices">${g.options.map((o, n) => `<button class="btn role-choice" data-role-choice="${n}"><span lang="ja">${esc(o)}</span></button>`).join('')}</div>` : `<div class="center role-done"><h2>對話完成！</h2><p>${total} 句台詞，失誤 ${g.mistakes} 次。現在每句都附上中文，可以再對照一次。</p></div>`}
+      </div>
+      <p id="feedback" class="meta" role="status" aria-live="polite">${esc(msg)}</p>
+      ${g.options ? '' : gameEnd('role')}
+    </section>`;
+    if (!g.options && !g.logged) { g.logged = true; Progress.endSession(Math.max(0, total - g.mistakes), total, '角色扮演'); }
+  }
+  function roleChoose(n, btn) {
+    const g = game, right = g.d.lines[g.i][1];
+    if (g.options[n] !== right) { g.mistakes++; btn.classList.add('wrong'); btn.disabled = true; $('#feedback').textContent = '這句不太對，想想對方剛剛說了什麼。'; return; }
+    g.shown.push(g.i); g.i++;
+    advanceRole([[right, 'B']]);
+  }
+
+  // ────────────────────────────── 今日：輕鬆一下 ──────────────────────────────
+  function phraseOfDay(now = new Date()) {
+    const pool = LIFE().topics.flatMap(t => [...(t.dialogue?.lines || []).map(([, jp, zh]) => ({ jp, zh, from: `生活日本・${t.title}` })), ...(t.phrases || []).map(p => ({ jp: p.parts.join(''), zh: p.zh, from: `生活日本・${t.title}` }))]);
+    if (!pool.length) return null;
+    const day = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 864e5);
+    return pool[(day * 7) % pool.length];
+  }
+  function todayExtras(level, unit) {
+    const list = Curriculum.all(level);
+    const lifeUnits = list.filter(u => u.auto === 'life');
+    const nextLife = lifeUnits.find(u => !Curriculum.stats(u).done) || lifeUnits[0];
+    const playUnit = [unit, ...list].find(u => u && !u.readOnly && Curriculum.pairs(u).length >= 4);
+    const fresh = Curriculum.freshUnits().filter(u => Curriculum.stats(u).status === 'todo');
+    const p = phraseOfDay();
+    return `${fresh.length ? `<section class="fresh-note">${icon('notebook')}<p>Notion 有新筆記，已排進課程：${fresh.map(u => `<a href="#/unit/${esc(u.key)}">${esc(u.title)}（${u.level} 第 ${u.index} 單元）</a>`).join('、')}</p></section>` : ''}
+    <section class="today-play" aria-label="輕鬆一下">
+      ${p ? `<article class="play-card phrase-day"><p class="eyebrow">今日一句</p><p class="pd-jp" lang="ja">${esc(p.jp)}</p><details><summary>看中文</summary><p>${esc(p.zh)}</p><p class="meta">${esc(p.from)}</p></details><button class="btn small" data-say="${esc(p.jp)}">${icon('speaker-high')} 聽</button></article>` : ''}
+      ${nextLife ? `<a class="play-card life-next ${THEME_CLASS[nextLife.theme] || ''}" href="#/unit/${esc(nextLife.key)}">${themeGlyph(nextLife.theme, 'big')}<p class="eyebrow">生活日本・${esc(nextLife.theme)}</p><b>${esc(nextLife.title)}</b><small>${esc(nextLife.desc)}</small></a>` : ''}
+      ${playUnit ? `<a class="play-card game-next" href="#/play/match?unit=${encodeURIComponent(playUnit.key)}">${icon('cards-three')}<p class="eyebrow">一分鐘小遊戲</p><b>配對：${esc(playUnit.title)}</b><small>把日文和意思連起來，挑戰最快紀錄。</small></a>` : ''}
+    </section>`;
   }
 
   // ────────────────────────────── 複習 ──────────────────────────────
@@ -257,7 +507,7 @@
     </div>`;
   }
   function sectionPractice(page, section) {
-    const items = [...DATA().vocab, ...DATA().grammar, ...DATA().phrases].filter(x => x.source?.startsWith(page.title + ' › ') && x.source.endsWith(' › ' + section.heading));
+    const items = [...DATA().vocab, ...DATA().grammar, ...DATA().phrases, ...(DATA().drills || [])].filter(x => x.source?.startsWith(page.title + ' › ') && x.source.endsWith(' › ' + section.heading));
     if (!items.length) return '';
     const source = items[0].source;
     return `<div class="actions"><a class="btn small" href="#/quiz?source=${encodeURIComponent(source)}&levels=all">練習這個單元</a></div>`;
@@ -291,16 +541,16 @@
     </section>${html}`;
   }
   // 朗讀交給 js/voice.js，套用聲音頁選擇的聲音和語氣。
-  function speak(text) { if (window.Voice) Voice.speak(text); }
+  function speak(text, role) { if (window.Voice && text) return Voice.speak(text, role === 'A' ? { preset: 'natural' } : {}); return null; }
 
   // ────────────────────────────── 測驗 ──────────────────────────────
   const quiz = { qs: [], i: 0, score: 0, answered: false, mode: '', wrong: [], answers: [] };
 
   function viewQuizSetup(params) {
     const levels = params.get('levels') === 'all' ? [...Quiz.LEVELS] : (params.get('levels') || Study.profile().level).split(',').filter(Boolean);
-    const types = (params.get('types') || (params.has('source') || params.has('page') ? 'vocab_meaning,vocab_reading,grammar,grammar_cloze,phrase' : 'vocab_meaning,vocab_reading')).split(',').filter(Boolean);
+    const types = (params.get('types') || (params.has('source') || params.has('page') ? 'vocab_meaning,vocab_reading,grammar,grammar_cloze,phrase,drill_meaning,drill_transform' : 'vocab_meaning,vocab_reading')).split(',').filter(Boolean);
     const weak = params.get('weak') === '1';
-    const origins = (params.get('origins') || 'notion,external').split(',').filter(Boolean);
+    const origins = (params.get('origins') || 'notion,external,life').split(',').filter(Boolean);
     const chip = (name, val, label, on) => `<label class="chip ${on ? 'on' : ''}"><input type="checkbox" name="${name}" value="${val}" ${on ? 'checked' : ''}>${label}</label>`;
     const o = Quiz.overallStats();
     return `
@@ -318,7 +568,7 @@
       }).join('')}</div>
       <p class="meta">至少選一個等級。N3～N1 為部分筆記。文法、會話與假名按所選單元出題，未做完整 JLPT 分級。</p>
       <h3>單字來源</h3>
-      <div class="chips">${chip('origins', 'notion', ` 作者筆記 <small>${o.notionVocab}</small>`, origins.includes('notion'))}${chip('origins', 'external', ` 公開單字 <small>${o.externalVocab}</small>`, origins.includes('external'))}</div>
+      <div class="chips">${chip('origins', 'notion', ` 作者筆記 <small>${o.notionVocab}</small>`, origins.includes('notion'))}${chip('origins', 'external', ` 公開單字 <small>${o.externalVocab}</small>`, origins.includes('external'))}${chip('origins', 'life', ` 生活日本 <small>${DATA().vocab.filter(v => v.origin === 'life').length}</small>`, origins.includes('life'))}</div>
       <p class="meta">至少選一個來源。公開單字中文多為 AI 翻譯，未全部人工校訂。</p>
       <h3>題數</h3>
       <div class="chips">${[10, 20, 30].map(n => `<label class="chip ${n === 10 ? 'on' : ''}"><input type="radio" name="count" value="${n}" ${n === 10 ? 'checked' : ''}>${n} 題</label>`).join('')}</div>
@@ -346,9 +596,9 @@
       <div class="quiz-top"><span class="tag">${esc(q.typeLabel)}</span><span class="meta">${quiz.i + 1} / ${quiz.qs.length}・${esc(q.item.level || '本單元')}</span><span class="score">獨立答對 ${quiz.score}</span></div>
       <div class="bar"><div class="fill" style="width:${quiz.i / quiz.qs.length * 100}%"></div></div>
       <div class="card question tape">
-        <div class="prompt ${[...q.prompt].length === 1 ? 'single' : ''}" lang="ja">${q.promptHtml || esc(q.prompt)}</div>
+        ${q.listen ? `<button class="listen-btn" data-say="${esc(q.listen)}" aria-label="播放題目發音">${icon('speaker-high')}<span>${esc(q.prompt)}</span></button>` : `<div class="prompt ${[...q.prompt].length === 1 ? 'single' : ''}" lang="ja">${q.promptHtml || esc(q.prompt)}</div>`}
         ${q.sub ? `<div class="sub">${esc(q.sub)}</div>` : ''}
-        ${q.type.startsWith('kanji') || q.input ? '' : `<button class="btn tiny say" data-say="${esc(q.item.reading || q.prompt)}" ${['vocab_word', 'kana'].includes(q.type) ? 'data-reveals="true"' : ''} aria-label="播放日文發音"><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span>${['vocab_word', 'kana'].includes(q.type) ? '（提示）' : ''}</button>`}
+        ${q.type.startsWith('kanji') || q.input || q.listen ? '' : `<button class="btn tiny say" data-say="${esc(q.item.reading || q.prompt)}" ${['vocab_word', 'kana'].includes(q.type) ? 'data-reveals="true"' : ''} aria-label="播放日文發音"><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span>${['vocab_word', 'kana'].includes(q.type) ? '（提示）' : ''}</button>`}
         ${q.hint ? `<div><button class="btn small" id="show-hint" aria-controls="question-hint" aria-expanded="false">需要提示</button><p id="question-hint" hidden></p></div>` : ''}
         ${q.usedHint ? '<p class="meta">這次已看過內容，計入練習，不增加跨日熟練次數。</p>' : ''}
       </div>
@@ -357,6 +607,7 @@
     </section>`;
     labelAudio();
     $('#answer-text')?.focus();
+    if (q.listen) speak(q.listen);
   }
 
   function teachingHtml(q) {
@@ -606,16 +857,26 @@
     const seg = pathPart.split('/').filter(Boolean);
     const view = seg[0] || 'home';
     // 導覽列只有四項，其他頁面歸到對應的那一項
-    const navView = { home: 'home', course: 'course', map: 'course', unit: 'course', review: 'review', quiz: 'review', reference: 'reference', notes: 'reference', kana: 'reference', kanji: 'reference', voice: 'settings', sync: 'sync', settings: 'settings' }[view] || 'home';
+    const navView = { home: 'home', course: 'course', map: 'course', unit: 'course', play: 'course', life: 'life', review: 'review', quiz: 'review', reference: 'reference', notes: 'reference', kana: 'reference', kanji: 'reference', voice: 'settings', sync: 'sync', settings: 'settings' }[view] || 'home';
     document.body.classList.remove('nav-open');
     $('#nav-toggle')?.setAttribute('aria-expanded', 'false');
-    quiz.qs = []; quiz.unitKey = '';
+    quiz.qs = []; quiz.unitKey = ''; game.kind = '';
     document.querySelectorAll('nav.top a').forEach(a => { const active = a.dataset.view === navView; a.classList.toggle('active', active); if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     window.scrollTo(0, 0);
     switch (view) {
       case 'map': case 'course': app().innerHTML = viewCourse(seg[1] || ''); break;
       case 'unit': app().innerHTML = viewUnit(decodeURIComponent(seg[1] || '')); break;
       case 'review': app().innerHTML = viewReview(); break;
+      case 'life': app().innerHTML = viewLife(decodeURIComponent(seg[1] || '')); break;
+      case 'play': {
+        const u = Curriculum.get(params.get('unit') || '');
+        if (!u) { app().innerHTML = viewUnit(params.get('unit') || ''); break; }
+        if (seg[1] === 'match' && Curriculum.pairs(u).length >= 2) startMatch(u);
+        else if (seg[1] === 'build' && buildItems(u).length) startBuild(u);
+        else if (seg[1] === 'role' && u.topic?.dialogue) startRole(u);
+        else app().innerHTML = viewUnit(u.key);
+        break;
+      }
       case 'reference': app().innerHTML = viewReference(); break;
       case 'notes': app().innerHTML = viewNotes(seg[1], params.get('q') || ''); break;
       case 'kana': app().innerHTML = viewKana(seg[1] || 'hira'); break;
@@ -630,7 +891,8 @@
           const u = Curriculum.get(unitKey);
           if (!u) { app().innerHTML = viewUnit(unitKey); break; }
           quiz.unitKey = u.key;
-          startQuiz(Curriculum.quizOpts(u, { weakOnly: params.get('weak') === '1', count: +params.get('count') || 10 }), `${u.level} 第 ${u.index} 單元`);
+          const types = params.get('types') ? { types: params.get('types').split(',') } : {};
+          startQuiz(Curriculum.quizOpts(u, { weakOnly: params.get('weak') === '1', count: +params.get('count') || 10, ...types }), `${u.level} 第 ${u.index} 單元${types.types?.includes('listen') ? '・聽力' : ''}`);
           break;
         }
         const mode = params.get('mode');
@@ -678,7 +940,32 @@
     if (e.target.closest('#dont-know')) return answer('');
     const c = e.target.closest('.choice'); if (c) return answer(+c.dataset.i);
     if (e.target.closest('#next')) return nextQuestion();
-    const s = e.target.closest('[data-say]'); if (s) { if (s.dataset.reveals && quiz.qs[quiz.i] && !quiz.answered) { quiz.qs[quiz.i].usedHint = true; s.textContent = '已用語音提示'; } return speak(s.dataset.say); }
+    const mc = e.target.closest('[data-match]'); if (mc && game.kind === 'match') return matchClick(mc.dataset.match, mc.dataset.id);
+    const bp = e.target.closest('[data-build-pick]'); if (bp && game.kind === 'build') { game.picked.push(...game.pool.splice(+bp.dataset.buildPick, 1)); return renderBuild(); }
+    const br = e.target.closest('[data-build-remove]'); if (br && game.kind === 'build') { game.pool.push(...game.picked.splice(+br.dataset.buildRemove, 1)); return renderBuild(); }
+    if (e.target.closest('#build-reset')) { game.pool.push(...game.picked); game.picked = []; return renderBuild(); }
+    if (e.target.closest('#build-check')) return checkBuild();
+    if (e.target.closest('#build-next')) { game.i++; return game.i < game.items.length ? setupBuild() : finishBuild(); }
+    const rc = e.target.closest('[data-role-choice]'); if (rc && game.kind === 'role') return roleChoose(+rc.dataset.roleChoice, rc);
+    const rp = e.target.closest('[data-replay]'); if (rp && game.u) return ({ match: startMatch, build: startBuild, role: startRole })[rp.dataset.replay]?.(game.u);
+    const tz = e.target.closest('[data-toggle-zh]');
+    if (tz) { const on = tz.getAttribute('aria-pressed') !== 'true'; tz.setAttribute('aria-pressed', String(on)); tz.textContent = on ? '隱藏中文' : '顯示中文'; tz.closest('.dialogue').querySelectorAll('.zh').forEach(z => { z.hidden = !on; }); return; }
+    const pd = e.target.closest('[data-play-dialogue]');
+    if (pd) {
+      const t = LIFE().topics.find(x => x.id === pd.dataset.playDialogue), box = pd.closest('.dialogue');
+      if (t) speakQueue(t.dialogue.lines.map(([who, jp]) => [jp, who]), i => box.querySelectorAll('.bubble').forEach((b, j) => b.classList.toggle('playing', j === i)));
+      return;
+    }
+    const tc = e.target.closest('[data-trivia-choice]');
+    if (tc) {
+      const box = tc.closest('[data-trivia]'), [tid, qi] = box.dataset.trivia.split(':'), q = LIFE().topics.find(x => x.id === tid)?.quiz?.[+qi];
+      if (!q) return;
+      const ok = +tc.dataset.triviaChoice === q.answer;
+      box.querySelectorAll('[data-trivia-choice]').forEach(b => { b.disabled = true; if (+b.dataset.triviaChoice === q.answer) b.classList.add('correct'); else if (b === tc) b.classList.add('wrong'); });
+      const ex = box.querySelector('.trivia-explain'); ex.hidden = false; ex.textContent = (ok ? '答對了！' : `正確答案是「${q.choices[q.answer]}」。`) + q.explain;
+      return;
+    }
+    const s = e.target.closest('[data-say]'); if (s) { if (s.dataset.reveals && quiz.qs[quiz.i] && !quiz.answered) { quiz.qs[quiz.i].usedHint = true; s.textContent = '已用語音提示'; } if (game.kind === 'build' && !game.solved && s.closest('.game')) game.usedHint = true; return speak(s.dataset.say, s.dataset.voiceRole); }
     if (e.target.closest('#create-code')) return syncAction(() => Sync.createNew(), c => ` 已產生同步碼 ${c}，把它抄到其他裝置就能接上。`);
     if (e.target.closest('#sync-now')) return syncAction(() => Sync.pull(), ' 同步完成。');
     if (e.target.closest('#unlink')) { if (confirm('這台裝置會停止同步（本機進度保留，雲端資料也還在）。確定？')) { Sync.unlink(); app().innerHTML = viewSync('已斷開。'); } return; }

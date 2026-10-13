@@ -2,7 +2,7 @@
 // 資料來源：window.NIHONGO_DATA（由 Notion 同步產生）
 // 進度來源：window.Progress（localStorage）
 window.Quiz = (() => {
-  const D = () => window.NIHONGO_DATA || { vocab: [], grammar: [], phrases: [], kana: [] };
+  const D = () => window.NIHONGO_DATA || { vocab: [], grammar: [], phrases: [], kana: [], drills: [] };
 
   // Mastery requires independently correct answers on three spaced, due reviews.
   // Legacy streaks are retained as history, never treated as spaced evidence.
@@ -35,6 +35,16 @@ window.Quiz = (() => {
                      prompt: g => clozeText(g), promptHtml: g => clozeHtml(g), sub: () => '空格只有一個答案',
                      hint: g => g.meaning, answer: g => g.pattern, kind: 'word' },
     phrase:        { label: '會話 → 中文', pool: 'phrases', prompt: p => p.jp, sub: p => p.romaji || '', answer: p => p.zh, kind: 'meaning' },
+    // 通用對照表（sync/parse-notion-md.mjs 的 tableDrills）：同一張表的其他答案當干擾選項
+    drill_meaning: { label: '句子 → 意思', pool: 'drills', filter: d => d.kind === 'meaning',
+                     prompt: d => d.prompt, sub: () => '', answer: d => d.answer, kind: 'meaning',
+                     distractors: d => sameTable(d), conflict: (a, b) => a.kind !== b.kind },
+    drill_transform: { label: '句型變換', pool: 'drills', filter: d => d.kind === 'transform',
+                     prompt: d => d.prompt, sub: d => `${d.from} → 改成「${d.ask}」`, answer: d => d.answer, kind: 'word',
+                     distractors: d => sameTable(d), conflict: (a, b) => a.kind !== b.kind || a.section !== b.section,
+                     detail: d => `${d.from}：${d.prompt}　→　${d.ask}：${d.answer}` },
+    listen:        { label: '聽音 → 單字', pool: 'vocab', filter: v => v.reading && v.reading !== v.word,
+                     prompt: () => '聽一聽，是哪個字？', sub: () => '按喇叭可以重聽', answer: v => v.word, kind: 'word', listen: v => v.reading },
     kana:          { label: '假名 → 羅馬拼音', pool: 'kana', prompt: k => k.hira, sub: k => k.kata, answer: k => k.romaji, kind: 'romaji' },
     // 漢字：id 加上 :on / :kun，讓同一個字的音讀和訓讀分開記進度
     kanji_on:      { label: '漢字 → 音讀', pool: 'kanji', filter: k => k.on.length > 0, id: k => k.id + ':on',
@@ -82,6 +92,7 @@ window.Quiz = (() => {
     return [...new Set([...seen, ...base])].filter(r => r !== w.seg);
   }
 
+  const sameTable = d => (D().drills || []).filter(x => x !== d && x.group === d.group && x.kind === d.kind).map(x => x.answer);
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
   // origins：['notion'] 只出你的筆記、['external'] 只出公開單字，空的就兩種都出（只影響單字題）
@@ -164,7 +175,7 @@ window.Quiz = (() => {
       const t = TYPES[tk];
       const answer = t.answer(it);
       const choices = t.input ? [] : shuffle([answer, ...pickDistractors(it, poolFor(tk, opts.levels, opts.origins), t)]);
-      return { id: qid, type: tk, typeLabel: tk === 'grammar' ? `${it.category || '文法'} → 意思` : t.label, prompt: t.prompt(it), promptHtml: t.promptHtml?.(it), sub: t.sub(it), hint: t.hint?.(it), input: !!t.input || choices.length < 2, answer, choices, item: it, detail: t.detail?.(it), learnFirst: !!opts.daily && !Progress.stat(qid).seen };
+      return { id: qid, type: tk, typeLabel: tk === 'grammar' ? `${it.category || '文法'} → 意思` : t.label, prompt: t.prompt(it), promptHtml: t.promptHtml?.(it), listen: t.listen?.(it), sub: t.sub(it), hint: t.hint?.(it), input: !!t.input || choices.length < 2, answer, choices, item: it, detail: t.detail?.(it), learnFirst: !!opts.daily && !Progress.stat(qid).seen };
     });
   }
 
@@ -182,7 +193,7 @@ window.Quiz = (() => {
   }
 
   function overallStats() {
-    const all = [...D().vocab, ...D().grammar, ...D().phrases, ...D().kana];
+    const all = [...D().vocab, ...D().grammar, ...D().phrases, ...D().kana, ...(D().drills || [])];
     const mastered = all.filter(x => isMastered(Progress.stat(x.id))).length;
     const weak = all.filter(x => isWeak(Progress.stat(x.id))).length;
     const externalVocab = D().vocab.filter(v => v.origin === 'external').length;

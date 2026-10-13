@@ -27,3 +27,45 @@
     ],
   });
 })();
+
+// ── 生活日本（data/life.js）：主題的單字、實用句併進題庫，並加一個「生活日本」筆記頁 ──
+// 已經有的單字（同字同讀音）直接共用，進度不會分成兩份。
+(() => {
+  const D = window.NIHONGO_DATA, L = window.NIHONGO_LIFE;
+  if (!D || !L || !Array.isArray(L.topics)) return;
+  const hash = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
+  D.drills ||= [];
+  const PAGE = '生活日本';
+  const byWord = new Map(D.vocab.map(v => [`${v.word}\t${v.reading}`, v]));
+  const byJp = new Map(D.phrases.map(p => [p.jp, p]));
+  for (const t of L.topics) {
+    const source = `${PAGE} › ${t.title}`;
+    t.items = { vocab: [], grammar: [], phrases: [], drills: [] };
+    for (const [word, reading, meaning] of t.vocab || []) {
+      let v = byWord.get(`${word}\t${reading}`);
+      if (!v) {
+        v = { id: 'l_' + hash(`${word}|${reading}|${t.level}`), word, reading, meaning, level: t.level, pos: '', origin: 'life', source };
+        D.vocab.push(v); byWord.set(`${word}\t${reading}`, v);
+      }
+      if (!t.items.vocab.includes(v)) t.items.vocab.push(v);
+    }
+    for (const ph of t.phrases || []) {
+      const jp = ph.parts.join('');
+      let p = byJp.get(jp);
+      if (!p) { p = { id: 'lp_' + hash(jp), jp, zh: ph.zh, romaji: '', category: t.title, source, parts: ph.parts, origin: 'life' }; D.phrases.push(p); byJp.set(jp, p); }
+      else p.parts ||= ph.parts;
+      if (!t.items.phrases.includes(p)) t.items.phrases.push(p);
+    }
+  }
+  D.pages.push({
+    id: 'life', title: PAGE, icon: '🗾', edited: '', life: true,
+    sections: L.topics.flatMap(t => [
+      { heading: t.title, level: 2, blocks: [
+        ...(t.intro || []).map(text => ({ type: 'para', text })),
+        { type: 'list', items: t.tips || [] },
+        { type: 'table', headers: ['單字', '讀音', '意思'], rows: (t.vocab || []).map(r => [...r]) },
+        { type: 'table', headers: ['日語', '中文'], rows: (t.phrases || []).map(p => [p.parts.join(''), p.zh]) },
+      ] },
+    ]),
+  });
+})();
