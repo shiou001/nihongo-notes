@@ -76,7 +76,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html _site/
-          cp -R css js data _site/
+          cp -R css js data img _site/
           rm -f _site/data/content.json
 
       - uses: actions/upload-pages-artifact@v3
