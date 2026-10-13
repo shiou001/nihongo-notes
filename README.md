@@ -28,13 +28,14 @@
 
 ## 設計與動畫（v0.11）
 
-風格參考 L'OCCITANE 的 Sustainability 頁：紙張顆粒的暖米白底、梅咖啡色文字、森林綠與向日葵黃、窄體襯線的英文大標題（Instrument Serif）配明朝體（Shippori Mincho、Noto Serif TC），區段用「(01)」編號。插畫（大樹、草地、飯糰、達摩、小花、小鳥、貓）都是 [js/art.js](js/art.js) 裡的原創 SVG。
+風格參考 L'OCCITANE 的 Sustainability 頁：紙張顆粒的暖米白底、梅咖啡色文字、森林綠與向日葵黃、窄體襯線的英文大標題（Instrument Serif）配明朝體（Shippori Mincho、Noto Serif TC），區段用「(01)」編號。
+
+**插圖**：首頁封面是 [img/cover-cat.webp](img/cover-cat.webp)（作者提供的貓咪看書圖）。各處的小角色是 8 隻貓（[img/cats/](img/cats/)），來自免費插圖站「[ぴよたそ](https://hiyokoyarou.com/about/)」：可用於網站、不需標註，但著作權屬原作者，**不可把圖檔單獨再散布或販售**；頁尾仍註明來源。換角色改 [js/art.js](js/art.js) 的 `CATS` 清單。
 
 | 效果 | 在哪裡 | 檔案 |
 |---|---|---|
 | 開場動畫：畫一個圓、「にほんご」浮上來、布幕往上收 | 每個分頁第一次打開 | `js/motion.js` |
-| 3D 櫻花瓣，滑鼠移動會起風（Three.js） | 首頁大圖 | `js/scene.js` |
-| 角色在草地上散步、樹冠與雲的視差 | 首頁大圖 | `js/art.js`、`css/natural.css` |
+| 封面圖淡入放大、貓咪輕輕晃動 | 首頁 | `css/natural.css` |
 | 標題逐字浮現、區塊捲動淡入、數字從 0 數上來、進度圈畫出來 | 每一頁 | `js/motion.js` |
 | 換頁交叉淡入（View Transitions） | 換頁時 | `js/motion.js` |
 | 按鈕顏色從左邊刷進來、主要按鈕磁吸、卡片跟著滑鼠傾斜、列表滑入 | 滑鼠懸停 | `css/natural.css` |
@@ -217,9 +218,9 @@ npm test
 ```
 index.html           單頁應用入口
 css/style.css        基礎樣式（natural.css 自然系外觀、life.css 生活日本與小遊戲）
-js/art.js            原創 SVG 插畫與小角色
+js/art.js            貓咪角色、頁尾草地、圓形進度
 js/motion.js         開場、捲動、懸停、換頁動畫與「動畫效果」設定
-js/scene.js          首頁 3D 櫻花瓣（Three.js，動態載入）
+img/                 封面圖與貓咪插圖（ぴよたそ）
 js/app.js            路由 + 各視圖
 js/quiz.js           出題引擎、熟練度規則
 js/progress.js       localStorage 進度 + 合併規則

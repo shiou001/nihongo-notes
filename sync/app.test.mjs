@@ -43,7 +43,9 @@ test('今日、課程、單元、複習、參考資料、筆記、測驗設定�
   assert.ok(a.document.querySelector('.home-hero .hero-title'));
   assert.equal(a.document.querySelectorAll('.home-sec .sec-no').length, 4);
   assert.ok(a.document.querySelector('.marquee[aria-hidden="true"]'));
-  assert.ok(a.document.querySelector('.home-hero svg.hero-art .walker'), '插畫與角色');
+  assert.ok(a.document.querySelector('.home-hero .hero-cover img[src*="cover-cat"]'), '封面圖');
+  assert.equal(a.document.querySelector('.home-hero .hero-greet, .home-hero .hero-lead, canvas'), null, '問候語、標語、櫻花都拿掉了');
+  assert.ok(a.document.querySelector('.review-chars img.cat[src*="img/cats/"]'), '貓咪角色');
   assert.match(a.document.querySelector('.hero-badge .ring').getAttribute('aria-label'), /N5 達成率 [0-9]+%/);
   a.route('#/review');
   assert.equal(a.document.querySelector('.page-head .display-en').textContent, 'Review');
@@ -55,8 +57,10 @@ test('今日、課程、單元、複習、參考資料、筆記、測驗設定�
     assert.ok(a.document.querySelector('main').textContent.length > 100, hash);
     assert.ok(!a.document.querySelector('main').innerHTML.includes('undefined'), hash);
   }
-  a.route('#/map');
+  a.route('#/course/N3');
   assert.match(a.document.querySelector('main').textContent, /部分筆記/);
+  assert.equal(a.document.querySelector('.page-head .lead'), null, '課程頁不放副標語');
+  a.route('#/map');
   assert.ok(!a.document.querySelector('main').textContent.includes('data/plan.js'));
   assert.equal(a.document.querySelector('nav.top a.active').textContent.trim(), '課程');
   assert.ok(a.document.querySelectorAll('.units li').length > 20);

@@ -17,8 +17,8 @@
   const glyph = (ch, cls = '') => `<span class="glyph ${cls}" aria-hidden="true" lang="ja">${esc(ch)}</span>`;
   const themeGlyph = (theme, cls = '') => glyph(LIFE().themes[theme]?.glyph || '和', `${THEME_CLASS[theme] || ''} ${cls}`);
   // 小角色（js/art.js）；沒載入時退回圖示
-  const CHAR_OF = { onigiri: 'onigiri', daruma: 'daruma', maneki: 'neko', torii: 'flower', fuji: 'bird', cloud: 'bird', star: 'flower' };
-  const doodle = n => window.Art ? Art.char(CHAR_OF[n] || 'onigiri') : icon(({ onigiri: 'cards', cloud: 'chart-line', star: 'check-circle', torii: 'calendar-blank' })[n] || 'book-open');
+  const CHAR_OF = { onigiri: 'kuro', daruma: 'chatora', maneki: 'maneki', torii: 'walk', fuji: 'mike', cloud: 'uruuru', star: 'maneki' };
+  const doodle = n => window.Art ? Art.char(CHAR_OF[n] || 'kuro') : icon(({ onigiri: 'cards', cloud: 'chart-line', star: 'check-circle', torii: 'calendar-blank' })[n] || 'book-open');
   // 首頁的編號區段標題：(01) 大大的英文 ＋ 中文
   const secHead = (no, en, zh, id = '', link = '') => `<header class="sec-head"><p class="sec-no">(${no})</p><h2${id ? ` id="${id}"` : ''}><span class="sec-en" aria-hidden="true">${en}</span><span class="sec-zh">${zh}</span></h2>${link}</header>`;
   const MARQUEE = [['にほんご', 'Nihongo'], ['ことば', 'Kotoba'], ['ひらがな', 'Hiragana'], ['かんじ', 'Kanji'], ['かいわ', 'Kaiwa'], ['たべもの', 'Tabemono'], ['たび', 'Tabi'], ['きせつ', 'Kisetsu']];
@@ -92,17 +92,12 @@
     const reviewHref = count ? due ? '#/quiz?mode=due' : '#/quiz?mode=daily' : '#/course';
     return `
     <section class="home-hero" aria-label="今日">
-      ${A ? A.hero() + A.petals() : ''}
-      <canvas class="petal-scene" aria-hidden="true"></canvas>
-      <div class="hero-copy">
-        <p class="hero-date">${date}</p>
-        <h1 class="hero-title"><span class="sr-only">にほんごノート </span>Nihongo<br>Note</h1>
-        <p class="hero-greet" lang="ja">${greeting()}</p>
-        <p class="hero-lead">今日，留一點時間給日文。<br>一點一點累積，日文會成為生活的一部分。</p>
-      </div>
-      ${A ? `<a class="hero-badge" href="#/course/${profile.level}">${A.ring(sum.pct, `${profile.level} 達成率`, `${sum.done} / ${sum.total} 單元`)}</a>` : ''}
+      <div class="hero-top"><p class="hero-date">${date}</p><h1 class="hero-title"><span class="sr-only">にほんごノート </span>Nihongo Note</h1></div>
+      <figure class="hero-cover">
+        <img src="img/cover-cat.webp?v=1" alt="在書架前看書的貓" width="1240" height="649" fetchpriority="high">
+        ${A ? `<a class="hero-badge" href="#/course/${profile.level}">${A.ring(sum.pct, `${profile.level} 達成率`, `${sum.done} / ${sum.total} 單元`)}</a>` : ''}
+      </figure>
       <div class="hero-cta"><a class="btn primary" href="${unit ? '#/unit/' + esc(unit.key) : '#/course'}">繼續單元 ${icon('arrow-right')}</a><a class="btn" href="${reviewHref}">${due ? '今日複習' : '今日練習'}</a></div>
-      <p class="hero-scroll" aria-hidden="true">Scroll</p>
     </section>
     ${window.Motion && Motion.pref() === 'auto' && Motion.systemReduce() ? '<p class="motion-note">你的系統開啟了「減少動態效果」，所以網站先停用動畫。<a href="#/settings">到設定開啟動畫</a></p>' : ''}
     ${marquee()}
@@ -111,16 +106,15 @@
       <div class="review-sec">
         <div class="review-copy"><p class="stat-label">${due ? '到期的題目' : '可以練習的題目'}</p><p class="big-stat"><b data-count="${count}">${count}</b><small>題</small></p></div>
         <div class="review-side">
-          <p class="meta">${count ? `${count > 20 ? '本輪 20 題，' : ''}約 ${Math.max(2, Math.ceil(Math.min(count, 20) * .6))} 分鐘。` : ''}${due ? '複習已學過的內容，加深記憶。' : count ? '目前沒有到期題目，從一點新內容開始。' : '今天的份量完成了，也可以繼續探索課程。'}</p>
+          <p class="meta">${count ? `${count > 20 ? '本輪 20 題，' : ''}約 ${Math.max(2, Math.ceil(Math.min(count, 20) * .6))} 分鐘` : '今天的份量完成了'}</p>
           <a class="btn primary" href="${reviewHref}">${count ? due ? '開始複習' : '開始練習' : '探索課程'} ${icon('arrow-right')}</a>
-          ${A ? `<div class="review-chars">${A.char('onigiri')}${A.char('flower')}${A.char('bird')}</div>` : ''}
+          ${A ? `<div class="review-chars">${count ? A.char('kuro') + A.char('mike') + A.char('shiro') : A.char('akubi')}</div>` : ''}
         </div>
       </div>
     </section>
     ${unit ? `<section class="home-sec">${secHead('02', 'Lesson', '目前學習單元')}<div class="current-lesson">
       <div class="lesson-preview"><p class="eyebrow">Unit ${unit.index} / ${unit.total}</p>
         ${samples.length ? `<div class="lesson-samples ${unit.kana.length ? 'kana-samples' : ''}">${samples.map(x => `<div><span lang="ja">${esc(x.word)}</span><small>${esc(x.reading || '')}</small></div>`).join('')}</div>` : `<p class="lesson-title-preview" lang="ja">${esc(unit.title)}</p>`}
-        <p class="meta preview-caption" lang="ja">ここから。一歩ずつ。</p>
       </div>
       <div class="lesson-info"><h2>${unit.title.startsWith(profile.level) ? '' : profile.level + ' '}${esc(unit.title)}</h2><div class="lesson-progress"><div class="bar" role="progressbar" aria-label="目前單元學習進度" aria-valuenow="${st.pct}" aria-valuemin="0" aria-valuemax="100"><div class="fill" style="width:${st.pct}%"></div></div><span class="meta">${unit.readOnly ? st.read ? '已讀完' : '尚未讀完' : `${st.learned} / ${st.total} 項已學`}</span></div><p class="meta lesson-desc">${esc(unit.desc)}</p><a class="text-link" href="#/unit/${esc(unit.key)}">繼續單元 ${icon('arrow-right')}</a></div>
     </div></section>` : '<section class="card"><h2>這一級還沒有課程</h2><a href="#/course">探索其他等級</a></section>'}
@@ -134,12 +128,12 @@
     if (!M) return '';
     const cur = M.pref(), opts = [['auto', '跟隨系統'], ['on', '開啟'], ['off', '關閉']];
     return `<section class="card"><h2>動畫效果</h2>
-      <p class="meta">開場動畫、捲動淡入、3D 櫻花瓣、角色散步。${M.systemReduce() ? '你的系統目前設定為「減少動態效果」，選「跟隨系統」時網站不會播放動畫。' : '你的系統允許動畫。'}</p>
+      <p class="meta">開場動畫、捲動淡入、換頁轉場、貓咪晃動。${M.systemReduce() ? '你的系統目前設定為「減少動態效果」，選「跟隨系統」時網站不會播放動畫。' : '你的系統允許動畫。'}</p>
       <div class="chips" role="radiogroup" aria-label="動畫效果">${opts.map(([v, label]) => `<button type="button" class="chip ${cur === v ? 'on' : ''}" role="radio" aria-checked="${cur === v}" data-motion="${v}">${label}</button>`).join('')}</div>
     </section>`;
   }
   function viewSettings() {
-    return `<section class="page-head"><h1>設定</h1><p class="lead">照自己的步調，安排日文學習。</p></section><section class="card"><h2>學習偏好</h2>${studyForm()}<p id="settings-status" class="meta" role="status"></p></section>${motionSettings()}<div class="ref-grid"><a class="card ref" href="#/voice"><h2>${icon('speaker-high')} 聲音</h2><p>調整日文朗讀的聲音與速度。</p></a><a class="card ref" href="#/sync"><h2>${icon('cloud')} 跨裝置同步</h2><p>把學習進度接到另一台裝置。</p></a></div>`;
+    return `<section class="page-head"><h1>設定</h1></section><section class="card"><h2>學習偏好</h2>${studyForm()}<p id="settings-status" class="meta" role="status"></p></section>${motionSettings()}<div class="ref-grid"><a class="card ref" href="#/voice"><h2>${icon('speaker-high')} 聲音</h2><p>調整日文朗讀的聲音與速度。</p></a><a class="card ref" href="#/sync"><h2>${icon('cloud')} 跨裝置同步</h2><p>把學習進度接到另一台裝置。</p></a></div>`;
   }
 
   // ────────────────────────────── 課程 ──────────────────────────────
@@ -151,7 +145,6 @@
     const tabs = Curriculum.LEVELS.map(l => { const z = Curriculum.levelSummary(l); return `<a class="btn small ${l === level ? 'primary' : ''}" href="#/course/${l}">${l} <small>${z.done}/${z.total}</small></a>`; }).join('');
     return `
     <section class="page-head"><h1> 課程</h1>
-      <p class="lead">每一級照順序排成單元：讀筆記、練題目、達標後往下走。單字課和漢字課會穿插在文法、會話之間。N3～N1 為部分筆記，仍在補充。</p>
       <div class="actions">${tabs}</div>
     </section>
     <section class="card map-card">
@@ -273,7 +266,6 @@
     };
     return `
     <section class="page-head"><h1>${glyph('和', 'title')} 生活日本</h1>
-      <p class="lead">吃拉麵、搭電車、看動畫、逛神社。每個主題是一個單元，也穿插在課程裡：讀文化小知識、聽情境對話、玩角色扮演；學到的單字和句子會進複習排程。</p>
       <div class="actions">${['', ...themes].map(th => `<a class="btn small ${th === theme ? 'primary' : ''}" href="#/life${th ? '/' + encodeURIComponent(th) : ''}">${th ? themeGlyph(th, 'tiny') + ' ' + esc(th) : '全部主題'}</a>`).join('')}</div>
     </section>
     <div class="life-grid">${topics.map(card).join('')}</div>
@@ -465,7 +457,7 @@
     const daily = Quiz.buildQuestions(Study.dailyOptions());
     const rows = Curriculum.LEVELS.map(l => { const z = Curriculum.levelSummary(l), s = Quiz.levelStats(l), k = Quiz.kanjiStats(l); return `<tr><td><a href="#/course/${l}">${l}</a></td><td>${z.done} / ${z.total}</td><td>${s.mastered} / ${s.total}</td><td>${k.mastered} / ${k.total}</td></tr>`; }).join('');
     return `
-    <section class="page-head"><h1> 複習</h1><p class="lead">到期的題目會在這裡等你。不管在哪個單元學的，到期就一起複習。</p></section>
+    <section class="page-head"><h1> 複習</h1></section>
     <section class="stats">
       <div class="stat card tape"><div class="num">${due}</div><div class="lbl">到期待複習</div>${doodle('onigiri')}</div>
       <div class="stat card tape"><div class="num">${o.weak}</div><div class="lbl">弱點</div>${doodle('cloud')}</div>
@@ -493,7 +485,7 @@
   function viewReference() {
     const d = DATA(); const o = Quiz.overallStats();
     return `
-    <section class="page-head"><h1> 參考資料</h1><p class="lead">課程用到的原始資料都在這裡，隨時查。想有系統地學，從 <a href="#/course">課程</a> 開始。</p></section>
+    <section class="page-head"><h1> 參考資料</h1></section>
     <div class="ref-grid">
       <a class="card ref" href="#/notes/0"><h2>${icon('notebook')} 筆記</h2><p>你的 Notion 筆記，${d.pages.length} 頁，可全文搜尋。</p></a>
       <a class="card ref" href="#/kana"><h2>${icon('text-aa')} 五十音</h2><p>平假名、片假名對照表，點一下會唸。</p></a>
@@ -593,7 +585,7 @@
     const chip = (name, val, label, on) => `<label class="chip ${on ? 'on' : ''}"><input type="checkbox" name="${name}" value="${val}" ${on ? 'checked' : ''}>${label}</label>`;
     const o = Quiz.overallStats();
     return `
-    <section class="page-head"><h1> 複習測驗</h1><p class="lead">預設依你的 ${Study.profile().level} 程度。先出到期複習，再出新內容；輸入題需自行回想答案。</p><a class="btn small" href="#/quiz?mode=daily">依目前程度開始今日練習</a>${masteryHelp()}</section>
+    <section class="page-head"><h1> 複習測驗</h1><a class="btn small" href="#/quiz?mode=daily">依目前程度開始今日練習</a>${masteryHelp()}</section>
     <form id="quiz-setup" class="card">
       ${params.has('source') || params.has('page') ? `<p>限定範圍：${esc(params.get('source') || params.get('page'))}</p><input type="hidden" name="source" value="${esc(params.get('source') || '')}"><input type="hidden" name="page" value="${esc(params.get('page') || '')}">` : ''}
       <h3>題型</h3>
@@ -717,7 +709,7 @@
     app().innerHTML = `
     <section class="result">
       <div class="card tape center">
-        <div class="result-mascot">${doodle(pct >= 80 ? 'maneki' : 'daruma')}</div>
+        <div class="result-mascot">${doodle(pct >= 80 ? 'maneki' : 'shiro')}</div>
         <h1>${quiz.score} / ${quiz.qs.length}</h1>
         <p class="lead">獨立答對 ${quiz.score} 題；含提示／先學後答共 ${correct} 題正確。</p><p>使用提示或剛學過的題目 ${assisted} 題。當次答對與跨日熟練分開計算。</p>
         <div class="actions">
@@ -773,7 +765,6 @@
     const cell = k => `<a class="kj ${Quiz.kanjiStatus(k)} ${cur === k ? 'on' : ''}" href="#/kanji/${level}/${encodeURIComponent(k.k)}" title="${esc(k.meanings.join(', '))}"><span class="big">${esc(k.k)}</span>${k.trad.length ? `<span class="trad">${esc(k.trad[0])}</span>` : ''}</a>`;
     return `
     <section class="page-head"><h1> 漢字</h1>
-      <p class="lead">字義你一看就懂，難的是讀音。這裡練音讀、訓讀，還有同一個字放進不同詞裡怎麼唸。</p>
       <div class="actions">${levels.map(l => `<a class="btn small ${l === level ? 'primary' : ''}" href="#/kanji/${l}">${l} <small>${K.filter(k => k.level === l).length}</small></a>`).join('')}</div>
     </section>
     <div class="grid2">
@@ -805,7 +796,7 @@
       <p class="meta">名字裡有 Desktop、Haruka、Ayumi、Ichiro 的是 Windows 內建的舊聲音，最像機器人。</p>`;
   function viewVoice() {
     const V = window.Voice;
-    const head = '<section class="page-head"><h1><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span> 聲音</h1><p class="lead">挑一個你喜歡的聲音和語氣。設定只存在這台裝置，因為每台裝置能用的聲音不一樣。</p></section>';
+    const head = '<section class="page-head"><h1><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span> 聲音</h1></section>';
     if (!V || !V.supported()) return `${head}<div class="card"><p>這個瀏覽器不支援語音朗讀，換 Chrome、Edge 或 Safari 試試看。</p></div>`;
     const list = V.voices(), cur = V.current(), st = V.settings();
     if (!list.length) return `${head}<div class="card"><h2>還沒找到日文聲音</h2><p>聲音清單可能還在載入，等一下會自動出現。如果一直是空的，代表這台裝置沒有日文語音，唸出來會很怪或沒有聲音。</p>${VOICE_HELP}</div>`;
@@ -834,7 +825,7 @@
   function viewSync(msg = '') {
     if (!Sync.enabled()) {
       return `
-      <section class="page-head"><h1> 跨裝置同步</h1><p class="lead">把測驗進度存到雲端，換手機、換電腦都接得上。</p></section>
+      <section class="page-head"><h1> 跨裝置同步</h1></section>
       <div class="card"><h2>尚未設定</h2>
         <p>需要一個免費的 Supabase 專案。步驟：</p>
         <ol>
@@ -848,7 +839,7 @@
     const code = Sync.getCode(); const st = Sync.getStatus();
     const o = Quiz.overallStats();
     return `
-    <section class="page-head"><h1> 跨裝置同步</h1><p class="lead">一組同步碼 = 一份進度。在每台裝置貼上同一組碼，進度就會合併在一起。</p></section>
+    <section class="page-head"><h1> 跨裝置同步</h1></section>
     ${msg ? `<div class="card ${msg.startsWith('錯誤：') ? 'bad' : 'good'}"><p>${esc(msg)}</p></div>` : ''}
     ${code ? `
     <div class="card tape">
@@ -1045,7 +1036,7 @@
     window.Motion?.init();
     // 頁尾的草地和角色
     const foot = document.querySelector('footer .foot-art');
-    if (foot && window.Art) foot.innerHTML = Art.hill() + `<div class="foot-chars">${Art.char('flower')}${Art.char('onigiri')}${Art.char('neko')}</div>`;
+    if (foot && window.Art) foot.innerHTML = Art.hill() + `<div class="foot-chars">${Art.char('shiro')}${Art.char('kuro')}${Art.char('chatora')}</div>`;
 
     Sync.init();
     // 聲音清單是非同步載入的：在聲音頁的話，載好後重畫

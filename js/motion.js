@@ -3,7 +3,6 @@
 //   換頁：支援 View Transitions 的瀏覽器用交叉淡入，其他瀏覽器用 CSS 淡入
 //   捲動：區塊進入畫面時淡入上浮（依序錯開）、數字從 0 數上來、圓形進度畫出來、插畫視差
 //   滑鼠：主要按鈕有磁吸感、卡片會跟著滑鼠微微傾斜
-//   3D：首頁的櫻花瓣用 Three.js（js/scene.js），載不到就用 CSS 花瓣
 window.Motion = (() => {
   const W = window, D = document;
   // 動畫設定：auto＝跟隨系統（Windows「動畫效果」、macOS「減少動態效果」），on＝一律開啟，off＝一律關閉
@@ -42,7 +41,9 @@ window.Motion = (() => {
       // 保險：轉場要等下一幀才開始；畫面停住（視窗縮小）時 0.4 秒後直接換頁
       let done = false;
       const run = () => { if (!done) { done = true; render(); } };
-      D.startViewTransition(run);
+      const t = D.startViewTransition(run);
+      // 連續快速換頁時，上一個轉場會被跳過（AbortError），不用報錯
+      for (const p of [t.ready, t.finished, t.updateCallbackDone]) p?.catch?.(() => {});
       setTimeout(run, 400);
       return;
     }
@@ -128,29 +129,11 @@ window.Motion = (() => {
     });
   }
 
-  // ── 3D 櫻花瓣 ──
-  let scene = null;
-  async function three(root) {
-    const canvas = root.querySelector('canvas.petal-scene');
-    if (scene && !D.contains(scene.canvas)) { scene.dispose(); scene = null; }
-    if (!canvas || scene || reduce()) return;
-    const host = canvas.closest('.home-hero');
-    try {
-      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-      if (!gl) return;
-      const mod = await import(new URL('js/scene.js?v=0.11.4', D.baseURI).href);
-      if (!D.contains(canvas)) return;
-      scene = mod.mount(canvas);
-      host?.classList.add('has-3d');
-    } catch (e) { /* 離線或 CDN 載不到：保留 CSS 花瓣 */ }
-  }
-
   // 每次換頁後呼叫
   function enhance(root = D.querySelector('main')) {
     if (!root) return;
     root.querySelectorAll('.page-head h1, .hero-title').forEach(splitChars);
     if (on()) { reveal(root); parallax(root); pointer(root); }
-    three(root);
   }
 
   function init() {
