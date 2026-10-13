@@ -241,3 +241,12 @@ footer a{color:var(--ink);font-weight:700}
 footer .hill-art path:last-child{opacity:.12}
 .feedback .card.good{background:var(--butter-soft)}
 .feedback .card.bad{background:var(--bad-soft)}
+/* 導覽列：網站名稱放最左邊，選單接在後面 */
+@media(min-width:901px){
+  header.top{grid-template-columns:auto 1fr auto}
+  .logo{grid-column:1;align-items:flex-start}
+  .nav-main{grid-column:2;justify-self:start;margin-left:clamp(16px,2.5vw,36px)}
+  .nav-bottom{grid-column:3}
+}
+/* 粉紅標題卡調淡（按鈕維持原本的櫻花粉） */
+.hero-card{background:#fac8d3}
