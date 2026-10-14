@@ -819,10 +819,10 @@
       <h2>語氣</h2>
       <div class="chips">${Object.entries(V.PRESETS).map(([k, p]) => `<button type="button" class="chip ${st.preset === k ? 'on' : ''}" data-voice-preset="${k}">${p.label}</button>`).join('')}</div>
       <form id="voice-test" class="search"><input name="text" value="${esc(VOICE_SAMPLE)}" aria-label="試聽句子"><button class="btn small primary">試聽</button></form>
-      <p class="meta">目前：${esc(cur?.name || '—')}</p>
+      <p class="meta">${V.library?.() && V.settings().source !== 'device' ? '有錄音的字唸東北きりたん；沒有錄音的字用：' : '目前：'}${esc(cur?.name || '—')}</p>
     </div>
     <div class="card">
-      <h2>聲音 <small>這台裝置有 ${list.length} 個日文聲音</small></h2>
+      <h2>裝置朗讀的聲音 <small>這台裝置有 ${list.length} 個日文聲音，只用在沒有錄音的字</small></h2>
       <ul class="voice-list">${list.map((v, i) => `
         <li class="${cur && v.name === cur.name ? 'on' : ''}">
           <button type="button" class="btn tiny" data-voice-try="${i}" aria-label="試聽 ${esc(v.name)}">${icon('play')}</button>

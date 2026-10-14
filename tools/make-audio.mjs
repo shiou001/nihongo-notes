@@ -29,6 +29,8 @@ export const audioKey = t => {
 const speakable = t => String(t).replace(/[〜～~]/g, '').replace(/[()（）]/g, ' ')
   .replace(/\s*[;；/／・]\s*/g, '、').replace(/\s+/g, '').replace(/^、+|、+$/g, '');
 
+// 介面上的試聽句子（聲音設定頁）。不在學習內容裡，所以要另外列，不然會被當成多餘的錄音
+export const UI_TEXTS = ['ありがとうございます', 'こんにちは！きょうも いっしょに がんばろうね。'];
 // 網站上所有會唸出來的文字（單一漢字讀音不只一種，留給瀏覽器朗讀）
 export async function collectTexts() {
   const w = globalThis;
@@ -42,6 +44,7 @@ export async function collectTexts() {
   (D.drills || []).forEach(d => add(d.prompt));
   D.grammar.forEach(g => add(g.pattern.replace(/[〜～]/g, '')));
   w.NIHONGO_LIFE.topics.forEach(t => t.dialogue?.lines.forEach(([, jp]) => add(jp)));
+  UI_TEXTS.forEach(add);
   return [...out];
 }
 
