@@ -810,7 +810,7 @@
       <p class="meta">名字裡有 Desktop、Haruka、Ayumi、Ichiro 的是 Windows 內建的舊聲音，最像機器人。</p>`;
   function viewVoice() {
     const V = window.Voice;
-    const head = '<section class="page-head"><h1><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span> 聲音</h1></section>';
+    const head = '<section class="page-head"><h1><span class="ph-icon" data-icon="speaker-high" aria-hidden="true"></span> 聲音</h1></section>' + voiceSourceCard();
     if (!V || !V.supported()) return `${head}<div class="card"><p>這個瀏覽器不支援語音朗讀，換 Chrome、Edge 或 Safari 試試看。</p></div>`;
     const list = V.voices(), cur = V.current(), st = V.settings();
     if (!list.length) return `${head}<div class="card"><h2>還沒找到日文聲音</h2><p>聲音清單可能還在載入，等一下會自動出現。如果一直是空的，代表這台裝置沒有日文語音，唸出來會很怪或沒有聲音。</p>${VOICE_HELP}</div>`;
@@ -819,10 +819,10 @@
       <h2>語氣</h2>
       <div class="chips">${Object.entries(V.PRESETS).map(([k, p]) => `<button type="button" class="chip ${st.preset === k ? 'on' : ''}" data-voice-preset="${k}">${p.label}</button>`).join('')}</div>
       <form id="voice-test" class="search"><input name="text" value="${esc(VOICE_SAMPLE)}" aria-label="試聽句子"><button class="btn small primary">試聽</button></form>
-      <p class="meta">目前：${esc(cur?.name || '—')}</p>
+      <p class="meta">${V.library?.() && V.settings().source !== 'device' ? '有錄音的字唸東北きりたん；沒有錄音的字用：' : '目前：'}${esc(cur?.name || '—')}</p>
     </div>
     <div class="card">
-      <h2>聲音 <small>這台裝置有 ${list.length} 個日文聲音</small></h2>
+      <h2>裝置朗讀的聲音 <small>這台裝置有 ${list.length} 個日文聲音，只用在沒有錄音的字</small></h2>
       <ul class="voice-list">${list.map((v, i) => `
         <li class="${cur && v.name === cur.name ? 'on' : ''}">
           <button type="button" class="btn tiny" data-voice-try="${i}" aria-label="試聽 ${esc(v.name)}">${icon('play')}</button>
@@ -834,6 +834,18 @@
     <div class="card">${VOICE_HELP}</div>`;
   }
   const voiceText = () => document.querySelector('#voice-test input')?.value || VOICE_SAMPLE;
+  // 聲音來源：VOICEVOX 東北きりたん的錄音（所有裝置一樣）或這台裝置的朗讀
+  function voiceSourceCard() {
+    const V = window.Voice, A = V?.library?.();
+    if (!A) return '';
+    const cur = V.settings().source, n = A.keys.split(',').length;
+    const opts = [['recorded', `錄音：${A.voice}`], ['device', '這台裝置的朗讀']];
+    return `<div class="card voice-source"><h2>聲音來源</h2>
+      <div class="chips" role="radiogroup" aria-label="聲音來源">${opts.map(([v, label]) => `<button type="button" class="chip ${cur === v ? 'on' : ''}" role="radio" aria-checked="${cur === v}" data-voice-source="${v}">${esc(label)}</button>`).join('')}</div>
+      <p class="meta">${esc(A.voice)}的錄音有 ${n} 段，手機和電腦聽到的都一樣。單一漢字、還沒錄音的新單字會用這台裝置的朗讀。下面的「語氣」選「慢慢說」也會讓錄音放慢。</p>
+      <div class="actions"><button type="button" class="btn small primary" data-say="ありがとうございます">${icon('speaker-high')} 試聽${esc(A.voice)}</button><a class="text-link" href="https://voicevox.hiroshiba.jp/product/tohoku_kiritan/" target="_blank" rel="noopener">${esc(A.credit)}</a></div>
+    </div>`;
+  }
 
   // ────────────────────────────── 跨裝置同步 ──────────────────────────────
   function viewSync(msg = '') {
@@ -1029,6 +1041,8 @@
     if (e.target.closest('#sync-now')) return syncAction(() => Sync.pull(), ' 同步完成。');
     if (e.target.closest('#unlink')) { if (confirm('這台裝置會停止同步（本機進度保留，雲端資料也還在）。確定？')) { Sync.unlink(); app().innerHTML = viewSync('已斷開。'); } return; }
     if (e.target.closest('#copy-code')) { navigator.clipboard?.writeText($('#synccode-text').textContent).then(() => { $('#copy-code').textContent = ' 已複製'; }); return; }
+    const vs = e.target.closest('[data-voice-source]');
+    if (vs && window.Voice) { Voice.set({ source: vs.dataset.voiceSource }); app().innerHTML = viewVoice(); decorateHead('voice'); return speak('ありがとうございます'); }
     const vp = e.target.closest('[data-voice-preset]');
     if (vp) { Voice.set({ preset: vp.dataset.voicePreset }); const t = voiceText(); app().innerHTML = viewVoice(); return speak(t); }
     const vt = e.target.closest('[data-voice-try]');
