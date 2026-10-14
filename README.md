@@ -143,7 +143,17 @@ node sync/sync-notion.mjs
 
 ## 🔊 聲音
 
-網站用瀏覽器內建的語音朗讀，聲音好不好聽取決於裝置。[js/voice.js](js/voice.js) 會自動挑最自然的日文聲音，頁尾的「🔊 聲音」可以自己換聲音、選語氣，每個聲音都能先試聽。
+**錄音：VOICEVOX 東北きりたん。** 單字、五十音、會話、例句、情境對話都事先用 [VOICEVOX](https://voicevox.hiroshiba.jp/product/tohoku_kiritan/) 的東北きりたん（ノーマル）錄好，放在 `audio/kiritan/`，清單在 `data/audio.js`。手機、電腦聽到的都是同一個聲音。授權：VOICEVOX 可商用與非商用，需註明「VOICEVOX:東北きりたん」（頁尾已註明）；角色屬於東北ずん子・ずんだもんプロジェクト，禁止販售音檔本身、損害角色形象的用途。
+
+在 Notion 加了新單字後，新字會先用裝置朗讀。要補錄音：
+
+1. 啟動 VOICEVOX 引擎：`D:VOICEVOXenginewindows-cpuun.exe`（或打開 VOICEVOX 程式）。
+2. `node tools/make-audio.mjs`（只會錄還沒有的，約每段半秒）。
+3. commit、push。
+
+「聲音」設定頁可以切回「這台裝置的朗讀」。單一漢字的讀音不只一種，一律用裝置朗讀。
+
+**裝置朗讀**（沒有錄音的字）：[js/voice.js](js/voice.js) 會自動挑最自然的日文聲音，頁尾的「🔊 聲音」可以自己換聲音、選語氣，每個聲音都能先試聽。
 
 | 裝置 | 推薦聲音 |
 |---|---|

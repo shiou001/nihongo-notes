@@ -28,7 +28,7 @@ test('不支援語音的環境：不報錯，speak 回傳 null', () => {
 test('設定：預設可愛語氣；換聲音和語氣會記住；亂填的語氣退回可愛', () => {
   assert.equal(V.settings().preset, 'cute');
   V.set({ name: 'Kyoko', preset: 'slow' });
-  assert.deepEqual(V.settings(), { name: 'Kyoko', preset: 'slow' });
+  assert.deepEqual(V.settings(), { name: 'Kyoko', preset: 'slow', source: 'recorded' });
   V.set({ preset: '亂填' });
   assert.equal(V.settings().preset, 'cute');
   assert.equal(V.settings().name, 'Kyoko');
@@ -57,4 +57,41 @@ test('speak：沒選過就用最自然的聲音；選過就用選的；選的聲
   const u4 = V.speak('うま', { voice: voices[0], preset: 'natural' });   // 試聽用的暫時設定
   assert.equal(u4.rate, V.PRESETS.natural.rate);
   assert.equal(spoken.length, 4);
+});
+
+test('錄音：有東北きりたん錄音的字播錄音檔；切到裝置朗讀或沒有錄音的字，改用裝置朗讀', () => {
+  const played = [], spoken = [];
+  window.Audio = function (src) { this.src = src; this.pause = () => {}; this.play = () => { played.push(this); return Promise.resolve(); }; };
+  window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+  window.speechSynthesis = { getVoices: () => [mk(NANAMI, 'ja-JP', false)], cancel() {}, speak: u => spoken.push(u) };
+  window.NIHONGO_AUDIO = { dir: 'audio/kiritan/', keys: [V.audioKey('ねこ'), V.audioKey('ありがとうございます')].join(',') };
+  V.set({ name: '', preset: 'cute', source: 'recorded' });
+
+  const h = V.speak('ねこ');
+  assert.equal(h.recorded, true);
+  assert.equal(played.at(-1).src, `audio/kiritan/${V.audioKey('ねこ')}.mp3`);
+  assert.equal(V.hasRecording(' ねこ '), true, '前後空白不影響');
+  let ended = false; h.onend = () => { ended = true; }; played.at(-1).onended();
+  assert.equal(ended, true, 'onend 可以接下一句');
+
+  assert.equal(V.speak('いぬ').text, 'いぬ', '沒有錄音的字用裝置朗讀');
+  V.set({ source: 'device' });
+  assert.equal(V.speak('ねこ').text, 'ねこ', '選了裝置朗讀就不播錄音');
+  assert.equal(spoken.length, 2);
+  V.set({ source: 'recorded', preset: 'slow' });
+  V.speak('ありがとうございます');
+  assert.equal(played.at(-1).playbackRate, 0.8, '慢慢說也套用在錄音上');
+  delete window.NIHONGO_AUDIO;
+});
+
+test('錄音清單：data/audio.js 列出的每一段錄音都真的有檔案', async () => {
+  const { readFile, access } = await import('node:fs/promises');
+  const src = await readFile(new URL('../data/audio.js', import.meta.url), 'utf8').catch(() => null);
+  if (!src) return;   // 還沒產生錄音時跳過
+  const w = {}; new Function('window', src)(w);
+  const A = w.NIHONGO_AUDIO, keys = A.keys.split(',');
+  assert.ok(keys.length > 0 && A.credit.startsWith('VOICEVOX:'));
+  const missing = [];
+  for (const k of keys) await access(new URL(`../${A.dir}${k}.mp3`, import.meta.url)).catch(() => missing.push(k));
+  assert.deepEqual(missing, [], '清單裡有錄音檔不存在');
 });
