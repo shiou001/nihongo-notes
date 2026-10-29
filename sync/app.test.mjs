@@ -25,7 +25,7 @@ async function app(hash = '#/') {
     Voice: { onVoicesChanged() {}, speak() {}, voices: () => [], get: () => ({}) },
   });
   ctx.window = ctx;
-  const scripts = ['data/content.js', 'data/external.js', 'data/life.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/art.js', 'js/app.js'];
+  const scripts = ['data/content.js', 'data/external.js', 'data/life.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/art.js', 'data/jlpt.js', 'js/jlpt-core.js', 'js/jlpt-figure.js', 'js/jlpt-player.js', 'js/jlpt-view.js', 'js/app.js'];
   for (const f of scripts) vm.runInContext(await readFile(new URL(f, root), 'utf8'), ctx, { filename: f });
   events.DOMContentLoaded();
   return { ctx, document,
@@ -254,4 +254,40 @@ test('已從題庫移除的舊題紀錄不會增加到期數', async () => {
   a.ctx.Progress.record('kw_removed_ambiguous_single_kanji', false, { now: Date.now() - 20 * 60 * 1000 });
   a.route('#/review');
   assert.equal(a.document.querySelector('.stats .stat .num').textContent, '0');
+});
+
+test('JLPT 專區：導覽列、首頁倒數、每日 20 題可作答並記錄、回報按鈕、今日卡片', async () => {
+  const a = await app('#/jlpt');
+  assert.ok(a.document.querySelector('nav.top a[data-view="jlpt"].active'));
+  assert.match(a.document.querySelector('main').textContent, /距離考試還有 [0-9]+ 天/);
+  assert.ok(a.document.querySelector('a[href="https://www.jlpt.jp/samples/sampleindex.html"]'), '官方範例題連結');
+  a.route('#/jlpt/daily');
+  const q = a.document.querySelector('.exam .q');
+  assert.ok(q && q.querySelectorAll('.bub').length >= 3);
+  a.click('.exam .q .bub[data-v="1"]');
+  assert.ok(a.document.querySelector('.exam .q .explain'), '練習模式作答後立刻顯示詳解');
+  assert.ok(Object.keys(a.ctx.Progress.load().items).some(k => k.startsWith('jlpt:')));
+  a.click('.exam [data-jlpt-report]');
+  assert.equal(Object.keys(a.ctx.Progress.jlpt().reports).length, 1);
+  a.route('#/');
+  assert.ok(a.document.querySelector('.play-card.jlpt-today'));
+  assert.ok(!a.document.querySelector('main').innerHTML.includes('undefined'));
+});
+
+test('JLPT 題本樣式：文字語彙題沒有 ruby；每日練習可以一路做完並記錄一次', async () => {
+  const a = await app('#/jlpt/daily');
+  for (const el of a.document.querySelectorAll('.exam .q[data-section="vocab"] .stem')) assert.equal(el.querySelector('ruby'), null);
+  for (let i = 0; i < 25 && a.document.querySelector('.exam .q .bub:not([disabled])'); i++) {
+    a.click('.exam .q .bub[data-v="2"]');
+    if (a.document.querySelector('[data-jlpt-next]')) a.click('[data-jlpt-next]');
+  }
+  assert.match(a.document.querySelector('main').textContent, /今天的 [0-9]+ 題做完了/);
+  assert.equal(a.ctx.Progress.load().sessions.filter(s => s.mode === 'jlpt-daily').length, 1);
+});
+
+test('JLPT 設定：可改考試日期與畢業門檻', async () => {
+  const a = await app('#/jlpt/settings');
+  a.submit('#jlpt-settings', [['target', 'N4'], ['examDate', '2027-12-05'], ['passPct', '0.85'], ['needed', '3']]);
+  const s = a.ctx.JLPT.settings();
+  assert.equal(s.examDate, '2027-12-05'); assert.equal(s.passPct, 0.85); assert.equal(s.needed, 3);
 });

@@ -1,0 +1,61 @@
+/* jlpt.css — JLPT 考試專區
+   專區首頁沿用網站的貼紙風；題目區（.exam）是「題本風格」：白紙、黑灰、UD 字體，像正式考試的題本 */
+
+.jlpt-count { font-size: 1.15rem; font-weight: 700; }
+.jlpt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; margin: 18px 0; }
+.jlpt-grid .card h2 { display: flex; align-items: center; gap: 8px; }
+.weak-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.weak-list li { display: grid; grid-template-columns: 6.5em 1fr 3em; align-items: center; gap: 8px; }
+.weak-list .bar { height: 10px; border: 1.5px solid var(--ink, #1f1f1f); border-radius: 999px; background: linear-gradient(90deg, var(--sakura, #f6a5b8) calc(var(--p) * 1%), transparent 0); }
+.jlpt-form { display: grid; gap: 12px; max-width: 420px; }
+.jlpt-form label { display: grid; gap: 4px; font-weight: 700; }
+.jlpt-form select, .jlpt-form input { font: inherit; padding: 6px 10px; border: 2px solid var(--ink, #1f1f1f); border-radius: 10px; background: #fff; }
+.play-card.jlpt-today .glyph { font-family: "BIZ UDPGothic", "Noto Sans TC", sans-serif; }
+
+/* ── 題本 ── */
+.exam {
+  --e-ink: #111; --e-gray: #666; --e-line: #bbb; --e-fill: #e6e6e6;
+  background: #fff; color: var(--e-ink);
+  font-family: "BIZ UDPGothic", "Noto Sans TC", sans-serif; line-height: 1.8;
+  border: 1.6px solid var(--e-ink); border-radius: 4px; box-shadow: none;
+  padding: clamp(16px, 4vw, 40px); margin: 18px 0; max-width: 820px;
+}
+.exam .exam-progress { color: var(--e-gray); font-size: .9rem; margin: 0 0 8px; }
+.exam .q { padding: 6px 0 4px; }
+.exam .qhead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.exam .qno { display: inline-grid; place-items: center; min-width: 1.9em; height: 1.9em; padding: 0 4px; border: 2px solid var(--e-ink); font-weight: 700; }
+.exam .qtype { font-size: .8rem; color: var(--e-gray); font-family: "Noto Sans TC", sans-serif; }
+.exam .stem { font-size: 1.15rem; margin: 6px 0 12px; }
+.exam ruby rt { font-size: .5em; }
+.exam u { text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
+.exam .ord-blank { display: inline-block; width: 3.2em; border-bottom: 1.5px solid var(--e-ink); margin: 0 4px; text-align: center; vertical-align: baseline; line-height: 1.2; }
+.exam .ord-blank.star { font-size: .9em; }
+.exam .box-no { display: inline-grid; place-items: center; min-width: 2.2em; padding: 0 4px; border: 1.6px solid var(--e-ink); font-weight: 700; }
+.exam .choices { list-style: none; padding: 0; margin: 0 0 12px 1em; display: grid; gap: 4px 12px; font-size: 1.1rem; }
+.exam .choices.row4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.exam .choices.grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.exam .choices .cn { display: inline-block; min-width: 1.4em; color: var(--e-ink); }
+.exam .sheet { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 12px; border: 1px solid var(--e-line); background: #fafafa; }
+.exam .sheet-label { font-size: .8rem; color: var(--e-gray); margin-right: 4px; }
+.exam .bub {
+  width: 42px; height: 42px; border-radius: 50%; border: 1.6px solid var(--e-ink); background: #fff; color: var(--e-ink);
+  font: inherit; font-size: .95rem; cursor: pointer; padding: 0; box-shadow: none;
+}
+.exam .bub:hover:not([disabled]) { background: var(--e-fill); }
+.exam .bub:focus-visible { outline: 3px solid #555; outline-offset: 2px; }
+.exam .bub.on { background: var(--e-ink); color: #fff; }
+.exam .bub[disabled] { cursor: default; }
+.exam .bub.ok { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--e-ink); }
+.exam .bub.ng { background: repeating-linear-gradient(45deg, #ddd 0 4px, #fff 4px 8px); color: var(--e-ink); text-decoration: line-through; }
+.exam .explain { margin-top: 12px; padding: 10px 14px; border-left: 4px solid var(--e-ink); background: #f4f4f4; font-family: "Noto Sans TC", sans-serif; }
+.exam .explain p { margin: 4px 0; }
+.exam .link-btn { background: none; border: 0; padding: 0; font: inherit; font-size: .85rem; color: var(--e-gray); text-decoration: underline; cursor: pointer; }
+.exam .link-btn[disabled] { text-decoration: none; cursor: default; }
+.exam .exam-actions { margin-top: 14px; }
+.exam .done .big { font-size: 1.3rem; font-weight: 700; }
+
+@media (max-width: 600px) {
+  .exam .choices.row4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .exam .choices.grid2 { grid-template-columns: 1fr; }
+  .exam .stem { font-size: 1.05rem; }
+}
