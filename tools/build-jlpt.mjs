@@ -40,10 +40,11 @@ function readingVariants(r) {
       if (SEION[k] === ch) { const t = [...s]; t[i] = DAKU[k]; put(0, t); }
       if (DAKU[k] === ch) { const t = [...s]; t[i] = SEION[k]; put(0, t); }
     }
-    // 長短音
-    const v = vowelOf(ch);
-    if ((v === 'o' || v === 'u') && s[i + 1] !== 'う') { const t = [...s]; t.splice(i + 1, 0, 'う'); put(1, t); }
-    if (v === 'e' && s[i + 1] !== 'い') { const t = [...s]; t.splice(i + 1, 0, 'い'); put(1, t); }
+    // 長短音：只在下一個字不是ん、っ、小字、母音時加長音（避免「せいんせい」這種不像日文的形）
+    const v = vowelOf(ch), next = s[i + 1];
+    const canLengthen = !next || !'んっゃゅょぁぃぅぇぉあいうえおー'.includes(next);
+    if ((v === 'o' || v === 'u') && canLengthen) { const t = [...s]; t.splice(i + 1, 0, 'う'); put(1, t); }
+    if (v === 'e' && canLengthen) { const t = [...s]; t.splice(i + 1, 0, 'い'); put(1, t); }
     if (i > 0 && ((ch === 'う' && ['o', 'u'].includes(vowelOf(s[i - 1]))) || (ch === 'い' && ['e', 'i'].includes(vowelOf(s[i - 1]))))) { const t = [...s]; t.splice(i, 1); put(1, t); }
     // 促音
     if (ch === 'っ') { const t = [...s]; t.splice(i, 1); put(2, t); }
@@ -166,7 +167,8 @@ async function main() {
     if (!(await exists(dir))) continue;
     const files = (await readdir(dir)).filter(f => f.endsWith('.json')).sort();
     const batches = [];
-    for (const f of files) batches.push({ batch: f.replace(/\.json$/, ''), ...JSON.parse(await readFile(path.join(dir, f), 'utf8')) });
+    // 級數取資料夾名稱（jlpt-src/n5/ → N5），批次檔可以不寫 level
+    for (const f of files) batches.push({ batch: f.replace(/\.json$/, ''), level, ...JSON.parse(await readFile(path.join(dir, f), 'utf8')) });
     // 錄音、插圖檢查在 tools/make-jlpt-audio.mjs、tools/jlpt-img.mjs 完成後接上（見實作計畫 Task 11、13）
     const out = buildLevel(batches, ctx, {});
     for (const w of out.warnings) console.warn('警告（未審查）', w);

@@ -64,3 +64,9 @@ test('buildLevel：聽解有錄音就輸出；文章題帶上 passage 並檢查�
   const missing = { ...rb, passages: {} };
   assert.ok(buildLevel([missing], ctx(), {}).errors.some(e => /p1/.test(e)), '引用不存在的文章');
 });
+
+test('genChoices：長音只加在自然的位置（不在ん、っ、小字、母音之前）', () => {
+  const v = [{ word: '先生', reading: 'せんせい' }, { word: '電車', reading: 'でんしゃ' }, { word: '白い', reading: 'しろい' }];
+  const all = ['先生/せんせい', '電車/でんしゃ', '白い/しろい'].flatMap(s => { const [w, r] = s.split('/'); return genChoices(w, r, 'kanji_reading', v, [], 'x').choices; });
+  for (const bad of ['せいんせい', 'でいんしゃ', 'しろうい']) assert.ok(!all.includes(bad), bad);
+});
