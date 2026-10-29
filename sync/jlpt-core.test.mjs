@@ -294,3 +294,12 @@ test('mockPoolLeft：各題型還沒考過的模擬考題數', async () => {
   assert.equal(J.mockPoolLeft('N5').kanji_reading, 5);
   assert.equal(J.mockPoolLeft('N5').text_grammar, 6);
 });
+
+test('assembleMock：題庫裡完全沒有的題型（例如聽解還沒做）不影響 fresh，只是少一科', async () => {
+  const b = makeMockBank();
+  b.levels.N5.questions = b.levels.N5.questions.filter(q => q.section !== 'listening');
+  const c = await load(b);
+  const p = c.JLPT.assembleMock({ level: 'N5', kind: 'mini', now: NOW });
+  assert.deepEqual([...p.sections.map(s => s.key)], ['vocab', 'grammarReading']);
+  assert.equal(p.fresh, true);
+});

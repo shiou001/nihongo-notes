@@ -218,6 +218,7 @@ window.JLPT = (() => {
         const need = kind === 'full' ? TYPES[type].full[level] || 0 : TYPES[type].mini;
         if (!need) continue;
         const units = groupUnits(usable.filter(q => q.type === type));
+        if (!units.length) continue; // 題庫裡還沒有這個題型（例如聽解還沒做）：少一科，不算「不是新題」
         const tiers = [
           units.filter(u => u[0].pool === 'mock' && !seenAt(u)),
           units.filter(u => u[0].pool === 'mock' && seenAt(u)).sort((a, b) => seenAt(a) - seenAt(b)),
