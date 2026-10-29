@@ -7,7 +7,7 @@ window.JLPTView = (() => {
   const icon = n => `<span class="ph-icon" data-icon="${n}" aria-hidden="true"></span>`;
   const DAILY_KEY = 'nihongo.jlpt.daily';
   const SAMPLES = 'https://www.jlpt.jp/samples/sampleindex.html';
-  let el = null, view = 'home', bound = false;
+  let el = null, view = 'home', bound = false, resultAt = '';
 
   const fmtDate = iso => { const [y, m, d] = String(iso).split('-').map(Number); return `${y}/${m}/${d}`; };
   const byId = level => new Map(J().bank(level).questions.map(q => [q.id, q]));
@@ -167,6 +167,60 @@ window.JLPTView = (() => {
   }
   function renderMock() { if (el) { el.innerHTML = viewMock(); startTimer(); } }
 
+  // ── 成績頁（規格 §7.5）──
+  const ESTIMATE_NOTE = '這是估計，官方用量尺分數，實際分數可能不同';
+  const findMock = at => Progress.jlpt().mocks.find(m => String(m.at) === String(at));
+  function viewResult(at) {
+    const m = findMock(at);
+    if (!m || !m.result) return `<section class="page-head" data-en="JLPT"><h1>找不到這次模擬考</h1><p><a href="#/jlpt">← JLPT 專區</a></p></section>`;
+    const r = m.result, s = J().settings();
+    const passMark = (J().PASS_TOTAL || {})[m.level] || 80;
+    const when = new Date(m.at).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' });
+    const sec = Object.entries(r.sections).filter(([, x]) => x.n).map(([k, x]) => `<li>${SECTION_NAME[k]}：${x.correct} / ${x.n}（${pct(x.pct)}）</li>`).join('');
+    const est = `<p>言語知識・讀解：約 <b>${r.lk.est}</b> / 120 分（最低 38 分）${r.lk.pass ? '　○ 過最低分' : '　× 沒過最低分'}</p>
+      ${r.listen ? `<p>聽解：約 <b>${r.listen.est}</b> / 60 分（最低 19 分）${r.listen.pass ? '　○ 過最低分' : '　× 沒過最低分'}</p>
+      <p>總分：約 <b>${r.estTotal}</b> / 180 分（及格 ${passMark} 分）　${r.estPass ? '<b>○ 估計合格</b>' : '<b>× 估計不合格</b>'}</p>` : '<p>聽解還沒開放，這次只算前兩科，不估計總分。</p>'}
+      <p class="meta">${ESTIMATE_NOTE}。</p>`;
+    const counted = m.counted ? `<p><b>○ 計入畢業</b>（正確率 ${pct(r.total.pct)}，畢業門檻 ${pct(s.passPct)}）</p>` : `<p><b>不計入畢業</b>：${esc((m.reasons || []).join('；'))}</p>`;
+    const types = Object.entries(r.byType).sort((a, b) => a[1].correct / a[1].n - b[1].correct / b[1].n)
+      .map(([t, o]) => `<li><span>${esc(J().TYPES[t].label)}</span><span class="bar" style="--p:${Math.round(o.correct / o.n * 100)}"></span><b>${o.correct}/${o.n}</b></li>`).join('');
+    const b = J().bank(m.level), map = new Map(b.questions.map(q => [q.id, q]));
+    const shown = new Set();
+    const review = m.qids.map((id, i) => {
+      const q = map.get(id);
+      if (!q) return '';
+      const p = q.passage && !shown.has(q.passage) ? (shown.add(q.passage), passageHtml(q, m.level, x => m.qids.indexOf(x) + 1)) : '';
+      return p + questionHtml(q, { mode: 'review', number: i + 1, chosen: m.answers[id] ?? null, reveal: true });
+    }).join('');
+    return `<section class="page-head" data-en="JLPT"><h1>模擬考成績</h1><p class="meta"><a href="#/jlpt">← JLPT 專區</a>・${esc(when)}・${m.kind === 'full' ? '全真' : '小型'}模擬考${m.paused ? '・有暫停' : ''}</p></section>
+      <div class="jlpt-grid">
+        <section class="card"><h2>${icon('check-circle')} 正確率 ${pct(r.total.pct)}</h2><p>${r.total.correct} / ${r.total.n} 題</p><ul>${sec}</ul>${counted}</section>
+        <section class="card"><h2>${icon('chart-line')} 估計分數</h2>${est}</section>
+        <section class="card"><h2>各題型</h2><ol class="weak-list">${types}</ol></section>
+      </div>
+      <h2 class="review-title">逐題對答案</h2><p class="meta">答錯的題目會進入複習，之後出現在每日練習。</p>
+      <section class="exam" id="jlpt-result">${review}</section>`;
+  }
+
+  // 首頁：模擬考與畢業
+  function mockHomeCard(s) {
+    const g = J().graduation(s.level), grad = Progress.jlpt().graduated;
+    const mocks = Progress.jlpt().mocks.filter(m => !m.abandoned && m.result);
+    const thisWeek = mocks.some(m => J().weekKey(new Date(m.at)) === J().weekKey());
+    const left = J().mockPoolLeft(s.level);
+    const short = Object.keys(J().TYPES).some(t => J().TYPES[t].mini && (J().TYPES[t].full[s.level] || 0) && left[t] < J().TYPES[t].mini);
+    const last = g.last.map(m => `<li><a href="#/jlpt/result/${m.at}">${new Date(m.at).toLocaleDateString('zh-TW')}</a>　${pct(m.result.total.pct)}</li>`).join('');
+    const recent = mocks.slice(-5).reverse().map(m => `<li><a href="#/jlpt/result/${m.at}">${new Date(m.at).toLocaleDateString('zh-TW')}・${m.kind === 'full' ? '全真' : '小型'}</a>　${pct(m.result.total.pct)}${m.counted ? '' : '（不計入）'}</li>`).join('');
+    return `<section class="card"><h2>${icon('check-circle')} 畢業進度</h2><p>目前練習：<b>${esc(s.level)}</b>　目標：<b>${esc(s.target)}</b></p>
+        <p class="meta">連續 ${s.needed} 份計入的模擬考答對 ${pct(s.passPct)} 以上，而且各科都過最低分，就畢業。</p>
+        ${grad[s.level] ? `<p><b>${esc(s.level)} 畢業了！</b>${J().bank(J().LEVELS[J().LEVELS.indexOf(s.level) - 1] || '').questions.length ? '' : `${esc(J().LEVELS[J().LEVELS.indexOf(s.level) - 1] || '')} 題庫準備中，先繼續練 ${esc(s.level)}。`}</p>` : ''}
+        ${last ? `<p>最近計入的模擬考：</p><ol>${last}</ol>` : '<p class="meta">還沒有計入的模擬考紀錄。</p>'}</section>
+      <section class="card"><h2>${icon('notebook')} 模擬考</h2><p>本週模擬考：${thisWeek ? '已完成' : '未完成'}</p>
+        ${short ? '<p class="notice-line">模擬考新題用完了：要補新的一批模擬考題，之後的模擬考才會計入畢業。</p>' : ''}
+        <p><a class="btn primary" href="#/jlpt/mock">${J().attempt() ? '繼續模擬考' : '開始模擬考'}</a></p>
+        ${recent ? `<p class="meta">最近的成績：</p><ol class="mock-list">${recent}</ol>` : ''}</section>`;
+  }
+
   // ── 專區首頁 ──
   function viewHome() {
     const s = J().settings(), days = J().daysLeft();
@@ -179,8 +233,7 @@ window.JLPTView = (() => {
     <div class="jlpt-grid">
       <section class="card"><h2>${icon('calendar-blank')} 每日 20 題</h2>
         ${hasBank ? `<p>今天 ${done} / ${n} 題</p><p><a class="btn primary" href="#/jlpt/daily">${done === 0 ? '開始今天的練習' : done < n ? '繼續今天的練習' : '看今天的結果'}</a></p>` : '<p class="meta">題庫準備中。</p>'}</section>
-      <section class="card"><h2>${icon('check-circle')} 畢業進度</h2><p>目前練習：<b>${esc(s.level)}</b>　目標：<b>${esc(s.target)}</b></p>
-        <p class="meta">連續 ${s.needed} 份模擬考答對 ${pct(s.passPct)} 以上就畢業。</p><p class="meta">還沒有模擬考紀錄。</p></section>
+      ${mockHomeCard(s)}
       <section class="card"><h2>${icon('chart-line')} 需要加強的題型</h2>
         ${weak.length ? `<ol class="weak-list">${weak.map(([t, o]) => `<li><span>${esc(J().TYPES[t].label)}</span><span class="bar" style="--p:${Math.round(o.pct * 100)}"></span><b>${pct(o.pct)}</b></li>`).join('')}</ol>` : '<p class="meta">做幾題之後，這裡會顯示最需要加強的題型。</p>'}</section>
       <section class="card"><h2>${icon('book-open')} 參考</h2>
@@ -208,7 +261,7 @@ window.JLPTView = (() => {
     if (!el) return;
     stopTimer();
     if (view === 'mock') return renderMock();
-    el.innerHTML = view === 'daily' ? viewDaily() : view === 'settings' ? viewSettings() : viewHome();
+    el.innerHTML = view === 'daily' ? viewDaily() : view === 'settings' ? viewSettings() : view === 'result' ? viewResult(resultAt) : viewHome();
   }
   function examClick(e) {
     const start = e.target.closest('[data-jlpt-start]');
@@ -239,6 +292,12 @@ window.JLPTView = (() => {
     if (bound) return; bound = true;
     document.addEventListener('click', e => {
       if (view === 'mock' && examClick(e)) return;
+      const rr = e.target.closest('#jlpt-result [data-jlpt-report]');
+      if (rr) {
+        const id = rr.closest('.q')?.dataset.qid, m = findMock(resultAt), q = m && J().bank(m.level).questions.find(x => x.id === id);
+        if (q) { J().report(q); render(); }
+        return;
+      }
       if (!e.target.closest('#jlpt-daily')) return;
       const bub = e.target.closest('.bub');
       if (bub && !bub.disabled) {
@@ -261,7 +320,8 @@ window.JLPTView = (() => {
   }
 
   function mount(target, seg = [], params) {
-    el = target; view = ['daily', 'settings', 'mock'].includes(seg[0]) ? seg[0] : 'home';
+    el = target; view = ['daily', 'settings', 'mock', 'result'].includes(seg[0]) ? seg[0] : 'home';
+    resultAt = seg[1] || '';
     bind(); render();
   }
 

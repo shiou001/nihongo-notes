@@ -279,6 +279,67 @@ window.JLPT = (() => {
     if (!sec || !sec.qids.includes(qid)) return false; // 只能改目前這一科
     a.answers[qid] = v; saveAttempt(a); return true;
   }
+  // ── 計分（規格 §4.2、§7.5）：估計分數＝正確率 × 滿分；官方是量尺分數，畫面上要註明是估計 ──
+  const PASS_TOTAL = { N5: 80, N4: 90, N3: 95, N2: 90, N1: 100 };
+  const tally = (ids, answers, map) => { const correct = ids.filter(id => map.get(id) && answers[id] === map.get(id).answer).length; return { correct, n: ids.length, pct: ids.length ? correct / ids.length : 0 }; };
+  function score(plan, answers = {}, b = bank(plan.level)) {
+    const map = new Map(b.questions.map(q => [q.id, q]));
+    const idsOf = key => plan.sections.find(s => s.key === key)?.qids || [];
+    const all = plan.sections.flatMap(s => s.qids);
+    const sections = Object.fromEntries(SECTION_ORDER.map(k => [k, tally(idsOf(k), answers, map)]));
+    const lkIds = [...idsOf('vocab'), ...idsOf('grammarReading')], lIds = idsOf('listening');
+    const t = tally(lkIds, answers, map), lk = { pct: t.pct, est: Math.round(t.pct * 120) };
+    lk.pass = lk.est >= 38;
+    let listen = null;
+    if (lIds.length) { const l = tally(lIds, answers, map); listen = { pct: l.pct, est: Math.round(l.pct * 60) }; listen.pass = listen.est >= 19; }
+    const estTotal = lk.est + (listen ? listen.est : 0);
+    const byType = {};
+    for (const id of all) { const q = map.get(id); if (!q) continue; const o = (byType[q.type] ||= { correct: 0, n: 0 }); o.n++; if (answers[id] === q.answer) o.correct++; }
+    return { total: tally(all, answers, map), sections, lk, listen, estTotal, estPass: listen ? estTotal >= (PASS_TOTAL[plan.level] || 80) && lk.pass && listen.pass : null, byType };
+  }
+  // 那一週的星期一（本地時間）
+  function weekKey(date = new Date()) {
+    const d = new Date(date); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  const countedMocks = level => P().jlpt().mocks.filter(m => m.counted && m.level === level).sort((a, b) => a.at - b.at);
+  const passes = (m, s = settings()) => !!(m.result && m.result.total.pct >= s.passPct && m.result.lk?.pass && m.result.listen?.pass);
+  // 畢業：最近 needed 份「計入」的模擬考都過
+  function graduation(level = settings().level) {
+    const s = settings(), last = countedMocks(level).slice(-s.needed);
+    return { done: last.length === s.needed && last.every(m => passes(m, s)), last };
+  }
+  // 交卷：計分、每題進 SRS、判斷是否計入、檢查畢業
+  function finishAttempt(now = Date.now()) {
+    const a = attempt();
+    if (!a) return null;
+    const plan = a.plan, b = bank(plan.level), map = new Map(b.questions.map(q => [q.id, q]));
+    const qids = plan.sections.flatMap(s => s.qids), result = score(plan, a.answers, b);
+    for (const id of qids) if (map.has(id)) P().record(qid(map.get(id)), a.answers[id] === map.get(id).answer, { now });
+    const reasons = [];
+    if (!plan.fresh) reasons.push('有些題目考過或來自練習題，不全是沒考過的新題');
+    if (!plan.sections.some(s => s.key === 'listening')) reasons.push('沒有考聽解');
+    if (a.interrupted) reasons.push('聽解中途中斷');
+    if (countedMocks(plan.level).some(m => weekKey(new Date(m.at)) === weekKey(new Date(now)))) reasons.push('這週已經有一份計入的模擬考');
+    const mock = { at: now, level: plan.level, kind: plan.kind, qids, answers: a.answers, result, counted: !reasons.length, reasons, paused: !!a.everPaused, abandoned: false, interrupted: !!a.interrupted };
+    P().saveJlpt(j => { j.mocks.push(mock); });
+    clearAttempt();
+    if (graduation(plan.level).done && !P().jlpt().graduated[plan.level]) {
+      P().saveJlpt(j => { j.graduated[plan.level] = now; });
+      const next = LEVELS[rank(plan.level) - 1];
+      if (next && bank(next).questions.length) setSettings({ level: next });
+    }
+    return mock;
+  }
+  // 各題型還沒考過的模擬考專用題數
+  function mockPoolLeft(level = settings().level) {
+    const seen = new Set(P().jlpt().mocks.flatMap(m => m.qids || []));
+    const out = {};
+    for (const q of bank(level).questions) if (q.pool === 'mock' && !q.example && !isReported(q) && !seen.has(q.id)) out[q.type] = (out[q.type] || 0) + 1;
+    for (const t of Object.keys(TYPES)) out[t] ||= 0;
+    return out;
+  }
+
   // 中途結束考試：留下紀錄（不計入畢業），清掉進行中的狀態
   function abandonAttempt(now = Date.now()) {
     const a = attempt();
@@ -303,5 +364,6 @@ window.JLPT = (() => {
 
   return { LEVELS, TYPES, SECTIONS, PASSAGE_TYPES, renderStem, validate, textErrors, esc,
     DEFAULTS, settings, setSettings, bank, qid, daysLeft, isReported, report, typeStats, dailySet,
-    assembleMock, attempt, saveAttempt, clearAttempt, startAttempt, timeLeft, pauseAttempt, resumeTimer, nextSection, setAnswer, resumeAttempt, currentSection, abandonAttempt };
+    assembleMock, attempt, saveAttempt, clearAttempt, startAttempt, timeLeft, pauseAttempt, resumeTimer, nextSection, setAnswer, resumeAttempt, currentSection, abandonAttempt,
+    score, weekKey, finishAttempt, graduation, mockPoolLeft, PASS_TOTAL };
 })();

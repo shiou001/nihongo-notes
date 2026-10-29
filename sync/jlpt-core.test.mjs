@@ -216,3 +216,81 @@ test('考試狀態：開始、剩餘時間、暫停（聽解不能）、下一�
   assert.equal(J.resumeAttempt(NOW + 2300e3).interrupted, true, '聽解中途重新整理 → 中斷');
   J.clearAttempt(); assert.equal(J.attempt(), null);
 });
+
+// ── Task 9：計分、計入規則、畢業 ──
+function bigMockBank() {
+  const b = makeMockBank({ paraphraseMock: 30 }), qs = b.levels.N5.questions;
+  // 每個題型補到 30 題、文章文法和中篇各補到 10 篇，讓每週都有新題
+  const more = [];
+  for (const q of qs.filter(x => !x.passage && x.pool === 'mock' && !x.id.startsWith('paraphrase'))) for (let k = 9; k <= 30; k++) if (q.id.endsWith('-1')) more.push({ ...q, id: q.id.replace(/-1$/, `-${k}`) });
+  for (let g = 4; g <= 10; g++) {
+    b.levels.N5.passages[`tg${g}`] = { stem: '{{#1}}{{#2}}{{#3}}' };
+    for (let k = 1; k <= 3; k++) more.push({ ...qs.find(x => x.id === 'tg1-1'), id: `tg${g}-${k}`, passage: `tg${g}`, blank: k });
+    b.levels.N5.passages[`rm${g}`] = { stem: 'ぶん' };
+    for (let k = 1; k <= 2; k++) more.push({ ...qs.find(x => x.id === 'rm1-1'), id: `rm${g}-${k}`, passage: `rm${g}` });
+  }
+  for (let i = 9; i <= 30; i++) { b.levels.N5.passages[`rs${i}`] = { stem: 'ぶん' }; b.levels.N5.passages[`is${i}`] = { stem: '|a|b|' }; more.push({ ...qs.find(x => x.id === 'rs-1'), id: `rs-${i}`, passage: `rs${i}` }, { ...qs.find(x => x.id === 'info_search-1'), id: `info_search-${i}`, passage: `is${i}` }); }
+  qs.push(...more);
+  return b;
+}
+// 考一份：ratio 是答對的比例（依題目順序前面答對、後面答錯）
+function takeMock(c, at, ratio) {
+  const J = c.JLPT, p = J.assembleMock({ level: 'N5', kind: 'mini', now: at });
+  const a = J.startAttempt(p, at), ids = p.sections.flatMap(s => s.qids);
+  ids.forEach((id, i) => { a.answers[id] = i < Math.round(ids.length * ratio) ? 1 : 2; });
+  J.saveAttempt(a);
+  return J.finishAttempt(at);
+}
+const DAY = 864e5;
+
+test('score：正確率、估計分數、各科最低分；聽解沒過最低分 → 不合格', async () => {
+  const c = await load(makeMockBank()), J = c.JLPT, bank = J.bank('N5');
+  const lkIds = bank.questions.filter(q => q.section !== 'listening').slice(0, 24).map(q => q.id);
+  const lIds = bank.questions.filter(q => q.section === 'listening').slice(0, 10).map(q => q.id);
+  const plan = { level: 'N5', kind: 'mini', fresh: true, sections: [{ key: 'vocab', qids: lkIds.slice(0, 12) }, { key: 'grammarReading', qids: lkIds.slice(12) }, { key: 'listening', qids: lIds }] };
+  const answers = {};
+  lkIds.forEach((id, i) => { answers[id] = i < 18 ? 1 : 2; });
+  lIds.forEach((id, i) => { answers[id] = i < 3 ? 1 : 2; });
+  const r = J.score(plan, answers);
+  assert.equal(r.total.correct, 21); assert.equal(r.total.n, 34);
+  assert.equal(r.lk.est, 90); assert.equal(r.lk.pass, true);
+  assert.equal(r.listen.est, 18); assert.equal(r.listen.pass, false);
+  assert.equal(r.estTotal, 108); assert.equal(r.estPass, false);
+  assert.equal(r.byType.kanji_reading.n > 0, true);
+  const noListen = J.score({ ...plan, sections: plan.sections.slice(0, 2) }, answers);
+  assert.equal(noListen.listen, null); assert.equal(noListen.estPass, null);
+});
+
+test('finishAttempt：記錄模擬考、每題進 SRS；同一週第二份、不是新題的不計入', async () => {
+  const c = await load(bigMockBank()), J = c.JLPT;
+  const m1 = takeMock(c, NOW, 1);
+  assert.equal(m1.counted, true); assert.equal(J.attempt(), null);
+  assert.ok(c.Progress.stat('jlpt:' + m1.qids[0]).seen === 1, '每題都記錄作答');
+  const m2 = takeMock(c, NOW + DAY, 1);
+  assert.equal(m2.counted, false); assert.match(m2.reasons.join(), /這週/);
+  assert.equal(J.weekKey(new Date(NOW)), '2026-11-02'); assert.equal(J.weekKey(new Date(NOW + 6 * DAY)), '2026-11-02'); assert.equal(J.weekKey(new Date(NOW + 7 * DAY)), '2026-11-09');
+  const c2 = await load(makeMockBank({ paraphraseMock: 1 }));
+  const m3 = takeMock(c2, NOW, 1);
+  assert.equal(m3.counted, false); assert.match(m3.reasons.join(), /新題/);
+});
+
+test('graduation：連續兩份計入的模擬考 ≥ 80% 且各科過最低分才畢業；中間沒過就重來；沒有 N4 題庫時留在 N5', async () => {
+  const c = await load(bigMockBank()), J = c.JLPT;
+  takeMock(c, NOW, 1);
+  takeMock(c, NOW + 7 * DAY, 0.5);
+  takeMock(c, NOW + 14 * DAY, 1);
+  assert.equal(J.graduation('N5').done, false, '中間那份沒過');
+  takeMock(c, NOW + 21 * DAY, 0.9);
+  const g = J.graduation('N5');
+  assert.equal(g.done, true); assert.equal(g.last.length, 2);
+  assert.ok(c.Progress.jlpt().graduated.N5 > 0);
+  assert.equal(J.settings().level, 'N5', 'N4 題庫還沒有，留在 N5');
+});
+
+test('mockPoolLeft：各題型還沒考過的模擬考題數', async () => {
+  const c = await load(makeMockBank()), J = c.JLPT;
+  assert.equal(J.mockPoolLeft('N5').kanji_reading, 8);
+  takeMock(c, NOW, 1);
+  assert.equal(J.mockPoolLeft('N5').kanji_reading, 5);
+  assert.equal(J.mockPoolLeft('N5').text_grammar, 6);
+});

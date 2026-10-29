@@ -343,3 +343,29 @@ test('JLPT 模擬考：結束考試 → 記錄為放棄、不計入，回到開�
   assert.equal(a.ctx.JLPT.attempt(), null);
   assert.ok(a.document.querySelector('[data-jlpt-start]'));
 });
+
+test('JLPT 成績頁：交完全部科目 → 估計分數與說明、不計入原因、逐題詳解與回報；首頁顯示本週已完成、新題不足提醒、成績連結', async () => {
+  const a = await app('#/jlpt/mock');
+  a.click('[data-jlpt-start][data-kind="mini"]');
+  const q1 = a.document.querySelector('#jlpt-exam .q:not(.example)');
+  a.click(`#jlpt-exam .q[data-qid="${q1.dataset.qid}"] .bub[data-v="1"]`);
+  for (let i = 0; i < 3 && a.document.querySelector('[data-jlpt-submit-section]'); i++) a.click('[data-jlpt-submit-section]');
+  const m = a.ctx.Progress.jlpt().mocks.at(-1);
+  assert.ok(m && !m.abandoned && m.result, '交卷後有紀錄');
+  assert.equal(a.ctx.JLPT.attempt(), null);
+  a.route('#/jlpt/result/' + m.at);
+  const text = a.document.querySelector('main').textContent;
+  assert.match(text, /這是估計，官方用量尺分數，實際分數可能不同/);
+  assert.match(text, /不計入畢業/);
+  assert.match(text, /聽解還沒開放，這次只算前兩科/);
+  assert.equal(a.document.querySelectorAll('#jlpt-result .q .explain').length, m.qids.length, '每題都有詳解');
+  a.click('#jlpt-result [data-jlpt-report]');
+  assert.equal(Object.keys(a.ctx.Progress.jlpt().reports).length, 1);
+  a.route('#/jlpt');
+  const home = a.document.querySelector('main').textContent;
+  assert.match(home, /本週模擬考：已完成/);
+  assert.match(home, /模擬考新題用完了/);
+  assert.ok(a.document.querySelector(`a[href="#/jlpt/result/${m.at}"]`));
+  assert.ok(a.document.querySelector('a[href="#/jlpt/mock"]'));
+  assert.ok(!a.document.querySelector('main').innerHTML.includes('undefined'));
+});
