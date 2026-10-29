@@ -1,5 +1,6 @@
 // progress.js — 測驗進度（localStorage）
-// 結構：{ items: { [id]: { seen, correct, wrong, streak, last } }, days: ['2026-09-11', ...], sessions: [{ at, score, total, mode }] }
+// 結構：{ items: { [id]: { seen, correct, wrong, streak, last } }, days: ['2026-09-11', ...], sessions: [{ at, score, total, mode }],
+//         jlpt: { settings, mocks: [...], reports: { [qid]: { at, rev } }, graduated: { [level]: at } } }
 window.Progress = (() => {
   const KEY = 'nihongo.progress';
   let state = null;
@@ -9,7 +10,13 @@ window.Progress = (() => {
     try { state = JSON.parse(localStorage.getItem(KEY)) || null; } catch { state = null; }
     if (!state || typeof state !== 'object') state = { items: {}, days: [], sessions: [] };
     state.items ||= {}; state.days ||= []; state.sessions ||= [];
+    state.jlpt = jlptDefaults(state.jlpt);
     return state;
+  }
+  // JLPT 專區的資料（模擬考紀錄、回報、設定、畢業）也放在這裡，跟著跨裝置同步
+  function jlptDefaults(j) {
+    j = j && typeof j === 'object' ? j : {};
+    return { settings: j.settings || null, mocks: j.mocks || [], reports: j.reports || {}, graduated: j.graduated || {} };
   }
   const listeners = new Set();
   function onChange(f) { listeners.add(f); return () => listeners.delete(f); }
@@ -37,11 +44,25 @@ window.Progress = (() => {
     const byAt = new Map();
     for (const s of [...(a.sessions || []), ...(b.sessions || [])]) if (s && s.at) byAt.set(s.at, s);
     const sessions = [...byAt.values()].sort((x, y) => x.at - y.at).slice(-200);
-    return { items, days, sessions };
+    return { items, days, sessions, jlpt: mergeJlpt(a.jlpt, b.jlpt) };
+  }
+  //   jlpt：模擬考以 at 聯集（不設上限）；設定取 updatedAt 新的；回報取較晚的；同級畢業取較早的
+  //   兩邊一樣時以 JSON 字串比較決定，讓 merge(a, b) 和 merge(b, a) 結果相同
+  const later = (x, y, key) => (x[key] || 0) !== (y[key] || 0) ? ((x[key] || 0) > (y[key] || 0) ? x : y) : (JSON.stringify(x) >= JSON.stringify(y) ? x : y);
+  function mergeJlpt(ja, jb) {
+    ja = jlptDefaults(ja); jb = jlptDefaults(jb);
+    const settings = ja.settings && jb.settings ? later(ja.settings, jb.settings, 'updatedAt') : ja.settings || jb.settings;
+    const byAt = new Map();
+    for (const m of [...ja.mocks, ...jb.mocks]) if (m && m.at) byAt.set(m.at, byAt.has(m.at) ? later(byAt.get(m.at), m, 'at') : m);
+    const reports = { ...ja.reports };
+    for (const [id, r] of Object.entries(jb.reports)) reports[id] = reports[id] ? later(reports[id], r, 'at') : r;
+    const graduated = { ...ja.graduated };
+    for (const [lv, at] of Object.entries(jb.graduated)) graduated[lv] = graduated[lv] ? Math.min(graduated[lv], at) : at;
+    return { settings, mocks: [...byAt.values()].sort((x, y) => x.at - y.at), reports, graduated };
   }
   // 整份替換（同步下載後使用）。不觸發 onChange，避免下載後又立刻上傳。
   function replace(next) {
-    state = { items: next.items || {}, days: next.days || [], sessions: next.sessions || [] };
+    state = { items: next.items || {}, days: next.days || [], sessions: next.sessions || [], jlpt: jlptDefaults(next.jlpt) };
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
   }
 
@@ -91,7 +112,10 @@ window.Progress = (() => {
     return n;
   }
 
-  function reset() { state = { items: {}, days: [], sessions: [] }; save(); }
+  function reset() { state = { items: {}, days: [], sessions: [], jlpt: jlptDefaults() }; save(); }
 
-  return { load, save, stat, record, endSession, streakDays, reset, merge, replace, onChange, dayKey };
+  const jlpt = () => load().jlpt;
+  function saveJlpt(fn) { fn(jlpt()); save(); }
+
+  return { load, save, stat, record, endSession, streakDays, reset, merge, replace, onChange, dayKey, jlpt, saveJlpt };
 })();

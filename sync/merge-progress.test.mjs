@@ -36,6 +36,39 @@ test('days 聯集排序，sessions 以 at 去重', () => {
 });
 
 test('空值與缺欄位不會爆', () => {
-  assert.deepEqual(merge(null, undefined), { items: {}, days: [], sessions: [] });
+  assert.deepEqual(merge(null, undefined), { items: {}, days: [], sessions: [], jlpt: { settings: null, mocks: [], reports: {}, graduated: {} } });
   assert.deepEqual(merge({}, { items: { z: { seen: 1 } } }).items.z, { seen: 1 });
+});
+
+test('jlpt：模擬考以 at 聯集、不受 sessions 200 筆限制；設定取 updatedAt 新的；回報與畢業聯集', () => {
+  const a = { items: {}, days: [], sessions: [], jlpt: { settings: { level: 'N5', examDate: '2027-07-04', updatedAt: 5 }, mocks: [{ at: 1 }, { at: 2 }], reports: { q1: { at: 10, rev: 1 } }, graduated: {} } };
+  const b = { items: {}, days: [], sessions: [], jlpt: { settings: { level: 'N4', examDate: '2027-12-05', updatedAt: 9 }, mocks: [{ at: 2 }, { at: 3 }], reports: { q2: { at: 11, rev: 2 } }, graduated: { N5: 7 } } };
+  const m = merge(a, b);
+  assert.deepEqual(m.jlpt.mocks.map(x => x.at), [1, 2, 3]);
+  assert.equal(m.jlpt.settings.level, 'N4');
+  assert.deepEqual(Object.keys(m.jlpt.reports).sort(), ['q1', 'q2']);
+  assert.equal(m.jlpt.graduated.N5, 7);
+  assert.deepEqual(merge(b, a).jlpt, m.jlpt);
+});
+
+test('jlpt：同一題回報取較晚的；同級畢業取較早的', () => {
+  const a = { jlpt: { reports: { q: { at: 5, rev: 1 } }, graduated: { N5: 30 } } };
+  const b = { jlpt: { reports: { q: { at: 9, rev: 2 } }, graduated: { N5: 20 } } };
+  const m = merge(a, b);
+  assert.deepEqual(m.jlpt.reports.q, { at: 9, rev: 2 });
+  assert.equal(m.jlpt.graduated.N5, 20);
+});
+
+test('jlpt：舊資料沒有 jlpt 也能合併，得到預設空結構', () => {
+  const m = merge({ items: {} }, { items: {} });
+  assert.deepEqual(m.jlpt, { settings: null, mocks: [], reports: {}, graduated: {} });
+});
+
+test('jlpt：replace 保留 jlpt；load 補上預設；saveJlpt 會寫入', () => {
+  window.Progress.replace({ items: {}, days: [], sessions: [], jlpt: { settings: { level: 'N5', updatedAt: 1 }, mocks: [{ at: 1 }], reports: {}, graduated: {} } });
+  assert.equal(window.Progress.jlpt().mocks.length, 1);
+  window.Progress.saveJlpt(j => { j.mocks.push({ at: 2 }); });
+  assert.equal(window.Progress.jlpt().mocks.length, 2);
+  window.Progress.replace({ items: {}, days: [], sessions: [] });
+  assert.deepEqual(window.Progress.jlpt(), { settings: null, mocks: [], reports: {}, graduated: {} });
 });
