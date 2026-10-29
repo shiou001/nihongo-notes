@@ -89,5 +89,85 @@ window.JLPT = (() => {
     return [...new Set(errs)];
   }
 
-  return { LEVELS, TYPES, SECTIONS, PASSAGE_TYPES, renderStem, validate, textErrors, esc };
+  // ── 設定與題庫 ──
+  const P = () => window.Progress;
+  const DEFAULTS = { level: 'N5', target: 'N4', examDate: '2027-07-04', passPct: 0.8, needed: 2 };
+  const settings = () => ({ ...DEFAULTS, ...(P().jlpt().settings || {}) });
+  function setSettings(patch) {
+    const prev = settings();
+    P().saveJlpt(j => { j.settings = { ...prev, ...patch, updatedAt: Math.max(Date.now(), (prev.updatedAt || 0) + 1) }; });
+  }
+  const EMPTY = { questions: [], passages: {} };
+  const bank = level => window.NIHONGO_JLPT?.levels?.[level] || EMPTY;
+  const qid = q => 'jlpt:' + q.id;
+  const stat = q => P().stat(qid(q));
+  // 剩幾天（以日期計算，不看時刻）
+  function daysLeft(now = new Date()) {
+    const [y, m, d] = settings().examDate.split('-').map(Number);
+    const today = new Date(now); today.setHours(0, 0, 0, 0);
+    return Math.round((new Date(y, m - 1, d) - today) / 864e5);
+  }
+
+  // ── 回報題目有問題：題目修正後 rev 加 1 就恢復出題 ──
+  const isReported = q => { const r = P().jlpt().reports[q.id]; return !!r && r.rev >= q.rev; };
+  const report = q => P().saveJlpt(j => { j.reports[q.id] = { at: Date.now(), rev: q.rev }; });
+
+  // 各題型的作答統計（例題不算）
+  function typeStats(level) {
+    const out = {};
+    for (const q of bank(level).questions) {
+      if (q.example) continue;
+      const s = stat(q), o = (out[q.type] ||= { seen: 0, correct: 0, wrong: 0, pct: null });
+      o.seen += s.seen; o.correct += s.correct; o.wrong += s.wrong;
+    }
+    for (const o of Object.values(out)) o.pct = o.correct + o.wrong ? o.correct / (o.correct + o.wrong) : null;
+    return out;
+  }
+
+  // ── 每日 20 題：弱點題型、到期錯題、新題、聽解（規格 §6）。同一篇文章的題目整組出 ──
+  function dailySet({ level = settings().level, now = Date.now(), count = 20, mix = { weak: 8, due: 6, fresh: 4, listening: 2 } } = {}) {
+    const eligible = bank(level).questions.filter(q => q.pool === 'practice' && !q.example && !isReported(q));
+    const units = [], byPassage = new Map();
+    for (const q of eligible) {
+      if (!q.passage) { units.push([q]); continue; }
+      if (!byPassage.has(q.passage)) { byPassage.set(q.passage, []); units.push(byPassage.get(q.passage)); }
+      byPassage.get(q.passage).push(q);
+    }
+    const ustat = u => u.map(stat);
+    const seen = u => ustat(u).some(s => s.seen);
+    const lastOf = u => Math.max(0, ...ustat(u).map(s => s.last || 0));
+    const isListening = u => u[0].section === 'listening';
+    const byId = (a, b) => (a[0].id < b[0].id ? -1 : 1);
+    const textUnits = units.filter(u => !isListening(u));
+
+    const due = textUnits.filter(u => ustat(u).some(s => s.seen && s.due && s.due <= now))
+      .sort((a, b) => Math.min(...ustat(a).map(s => s.due || Infinity)) - Math.min(...ustat(b).map(s => s.due || Infinity)) || byId(a, b));
+    const ts = typeStats(level);
+    const weakTypes = Object.keys(ts).filter(t => ts[t].pct !== null && TYPES[t].section !== 'listening').sort((a, b) => ts[a].pct - ts[b].pct || a.localeCompare(b));
+    const weak = weakTypes.flatMap(t => textUnits.filter(u => u[0].type === t).sort((a, b) => seen(a) - seen(b) || lastOf(a) - lastOf(b) || byId(a, b)));
+    // 新題：筆記裡學過的（refs）優先，再依題型輪流
+    const freshSorted = textUnits.filter(u => !seen(u)).sort((a, b) => (b[0].refs ? 1 : 0) - (a[0].refs ? 1 : 0) || byId(a, b));
+    const perType = new Map();
+    for (const u of freshSorted) { if (!perType.has(u[0].type)) perType.set(u[0].type, []); perType.get(u[0].type).push(u); }
+    const fresh = [];
+    for (let i = 0; [...perType.values()].some(l => i < l.length); i++) for (const l of perType.values()) if (i < l.length) fresh.push(l[i]);
+    const listening = units.filter(isListening).sort((a, b) => seen(a) - seen(b) || lastOf(a) - lastOf(b) || byId(a, b));
+
+    const picked = new Set(), out = [];
+    const take = (list, n) => {
+      let added = 0;
+      for (const u of list) {
+        if (added >= n || out.length >= count) break;
+        if (picked.has(u) || out.length + u.length > count) continue;
+        picked.add(u); out.push(...u); added += u.length;
+      }
+    };
+    take(due, mix.due); take(weak, mix.weak); take(fresh, mix.fresh); take(listening, mix.listening);
+    // 不夠時依序用 新題、到期、弱點 補，最後用最久沒做的題目補滿
+    for (const list of [fresh, due, weak, [...units].sort((a, b) => lastOf(a) - lastOf(b) || byId(a, b))]) take(list, count);
+    return out;
+  }
+
+  return { LEVELS, TYPES, SECTIONS, PASSAGE_TYPES, renderStem, validate, textErrors, esc,
+    DEFAULTS, settings, setSettings, bank, qid, daysLeft, isReported, report, typeStats, dailySet };
 })();

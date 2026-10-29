@@ -69,3 +69,72 @@ test('validate：id 重複、聽解沒有 script、rev／pool／explain／sectio
   assert.ok(JLPT.validate({ ...base, section: 'grammar' }, ctx()).some(e => /section/.test(e)));
   assert.ok(JLPT.validate({ ...base, type: 'reading_mid', section: 'reading' }, ctx()).some(e => /passage/.test(e)));
 });
+
+// ── Task 5：設定、每日 20 題、回報 ──
+const NOW = new Date('2026-11-02T09:00:00').getTime();
+function makeBank() {
+  const qs = [];
+  const mk = (type, i, extra = {}) => ({ id: `${type}-${i}`, level: 'N5', type, section: { context: 'vocab', kanji_reading: 'vocab', paraphrase: 'vocab', grammar_form: 'grammar', text_grammar: 'grammar', point: 'listening' }[type], pool: 'practice', rev: 1, stem: 'あ', choices: ['a', 'b', 'c', 'd'], answer: 1, explain: '…', ...extra });
+  for (const type of ['context', 'kanji_reading', 'paraphrase', 'grammar_form']) {
+    for (let i = 1; i <= 10; i++) qs.push(mk(type, i));
+    qs.push(mk(type, 'ex', { example: true }));
+  }
+  for (let i = 1; i <= 10; i++) qs.push(mk('context', `m${i}`, { pool: 'mock' }));
+  qs.push(mk('text_grammar', 'p1a', { passage: 'p1' }), mk('text_grammar', 'p1b', { passage: 'p1' }));
+  return { voices: { N: 30, M: 21, F: 108 }, levels: { N5: { questions: qs, passages: { p1: { id: 'p1', stem: 'ぶんしょう' } } } } };
+}
+async function withHistory() {
+  const c = await load(makeBank());
+  const { Progress, JLPT } = c;
+  for (const i of [1, 2, 3]) Progress.record(`jlpt:grammar_form-${i}`, false, { now: NOW - 2 * 3600e3 });
+  for (const i of [1, 2, 3]) Progress.record(`jlpt:context-${i}`, true, { now: NOW - 2 * 3600e3 });
+  return c;
+}
+
+test('dailySet：20 題、不含模擬考專用題、例題、被回報的題；弱點題型優先', async () => {
+  const { JLPT } = await withHistory();
+  const reported = JLPT.bank('N5').questions.find(q => q.id === 'grammar_form-9');
+  JLPT.report(reported);
+  const set = JLPT.dailySet({ level: 'N5', now: NOW });
+  assert.equal(set.length, 20);
+  assert.ok(set.every(q => q.pool === 'practice' && !q.example));
+  assert.ok(!set.some(q => q.id === 'grammar_form-9'));
+  assert.ok(set.filter(q => q.type === 'grammar_form').length >= 4, '答錯最多的題型最多');
+  assert.equal(new Set(set.map(q => q.id)).size, 20, '不重複');
+  const p1 = set.filter(q => q.passage === 'p1').length;
+  assert.ok(p1 === 0 || p1 === 2, '同一篇文章的題目一起出現');
+});
+
+test('dailySet：到期的錯題會出；沒有聽解題時由其他類別補滿', async () => {
+  const { JLPT } = await withHistory();
+  const set = JLPT.dailySet({ level: 'N5', now: NOW });
+  assert.ok(['grammar_form-1', 'grammar_form-2', 'grammar_form-3'].every(id => set.some(q => q.id === id)));
+  assert.equal(set.filter(q => q.section === 'listening').length, 0);
+  assert.equal(set.length, 20);
+});
+
+test('typeStats：各題型正確率', async () => {
+  const { JLPT } = await withHistory();
+  const s = JLPT.typeStats('N5');
+  assert.equal(s.grammar_form.pct, 0); assert.equal(s.context.pct, 1); assert.equal(s.paraphrase.seen, 0);
+});
+
+test('回報後不出；題目修正（rev 增加）後恢復出題', async () => {
+  const { JLPT, Progress } = await load(makeBank());
+  const q = JLPT.bank('N5').questions.find(x => x.id === 'context-3');
+  JLPT.report(q);
+  assert.ok(JLPT.isReported(q));
+  assert.ok(!JLPT.isReported({ ...q, rev: q.rev + 1 }));
+  assert.equal(Progress.jlpt().reports['context-3'].rev, 1);
+});
+
+test('設定：預設值；修改會寫入 updatedAt；倒數天數；沒有題庫時回傳空的', async () => {
+  const { JLPT, Progress } = await load();
+  assert.equal(JLPT.settings().examDate, '2027-07-04');
+  assert.equal(JLPT.settings().level, 'N5'); assert.equal(JLPT.settings().target, 'N4');
+  JLPT.setSettings({ passPct: 0.85 });
+  assert.equal(JLPT.settings().passPct, 0.85); assert.ok(Progress.jlpt().settings.updatedAt > 0);
+  assert.equal(JLPT.daysLeft(new Date('2027-07-01T09:00')), 3);
+  assert.equal(JLPT.bank('N4').questions.length, 0);
+  assert.equal(JLPT.qid({ id: 'a' }), 'jlpt:a');
+});
