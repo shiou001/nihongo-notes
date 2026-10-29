@@ -138,3 +138,81 @@ test('設定：預設值；修改會寫入 updatedAt；倒數天數；沒有題�
   assert.equal(JLPT.bank('N4').questions.length, 0);
   assert.equal(JLPT.qid({ id: 'a' }), 'jlpt:a');
 });
+
+// ── Task 7：文章（表格、方框號碼對應題號）──
+test('renderStem：| 開頭的行變成表格；方框號碼可以換成畫面上的題號', async () => {
+  const { JLPT } = await load();
+  assert.match(JLPT.renderStem('|じかん|ばしょ|\n|9じ|１かい|'), /<table[\s\S]*<td>9じ<\/td>/);
+  assert.match(JLPT.renderStem('おしらせ\n|a|b|\n|c|d|\nおわり'), /^おしらせ<br><table[\s\S]*<\/table>おわり$/);
+  assert.match(JLPT.renderStem('{{#1}}と{{#2}}', { boxNo: { 1: 22, 2: 23 } }), /box-no">22<[\s\S]*box-no">23</);
+  assert.match(JLPT.renderStem('{{#1}}', { boxNo: { 1: 5 }, current: 1 }), /box-no current">5</);
+});
+
+// ── Task 8：組卷與考試狀態 ──
+function makeMockBank({ paraphraseMock = 8 } = {}) {
+  const qs = [], passages = {};
+  const SEC = { kanji_reading: 'vocab', orthography: 'vocab', context: 'vocab', paraphrase: 'vocab', grammar_form: 'grammar', sentence_order: 'grammar', text_grammar: 'grammar', reading_short: 'reading', reading_mid: 'reading', info_search: 'reading', task: 'listening', point: 'listening', utterance: 'listening', response: 'listening' };
+  const add = (type, id, extra = {}) => qs.push({ id, level: 'N5', type, section: SEC[type], pool: 'mock', rev: 1, stem: 'あ', choices: type === 'utterance' || type === 'response' ? ['a', 'b', 'c'] : ['a', 'b', 'c', 'd'], answer: 1, explain: '…', ...extra });
+  for (const type of ['kanji_reading', 'orthography', 'context', 'grammar_form', 'sentence_order', 'info_search', 'task', 'point', 'utterance', 'response']) for (let i = 1; i <= 8; i++) add(type, `${type}-${i}`, type === 'info_search' ? { passage: `is${i}` } : {});
+  for (let i = 1; i <= paraphraseMock; i++) add('paraphrase', `paraphrase-${i}`);
+  for (let i = 1; i <= 8; i++) add('paraphrase', `paraphrase-p${i}`, { pool: 'practice' });
+  for (let g = 1; g <= 3; g++) { passages[`tg${g}`] = { stem: '{{#1}}{{#2}}{{#3}}' }; for (let b = 1; b <= 3; b++) add('text_grammar', `tg${g}-${b}`, { passage: `tg${g}`, blank: b }); }
+  for (let g = 1; g <= 3; g++) { passages[`rm${g}`] = { stem: 'ぶん' }; for (let b = 1; b <= 2; b++) add('reading_mid', `rm${g}-${b}`, { passage: `rm${g}` }); }
+  for (let i = 1; i <= 8; i++) { passages[`rs${i}`] = { stem: 'ぶん' }; add('reading_short', `rs-${i}`, { passage: `rs${i}` }); }
+  for (let i = 1; i <= 8; i++) passages[`is${i}`] = { stem: '|a|b|' };
+  return { voices: { N: 30, M: 21, F: 108 }, levels: { N5: { questions: qs, passages } } };
+}
+const secCount = (c, p, key) => { const s = p.sections.find(x => x.key === key); const by = {}; for (const id of s.qids) { const q = c.JLPT.bank('N5').questions.find(x => x.id === id); by[q.type] = (by[q.type] || 0) + 1; } return by; };
+
+test('assembleMock mini：三科順序、題數符合 §7.1、時間依比例、優先沒考過的模擬考題、文章題整組', async () => {
+  const c = await load(makeMockBank());
+  const p = c.JLPT.assembleMock({ level: 'N5', kind: 'mini', now: NOW });
+  assert.deepEqual([...p.sections.map(s => s.key)], ['vocab', 'grammarReading', 'listening']);
+  assert.deepEqual({ ...secCount(c, p, 'vocab') }, { kanji_reading: 3, orthography: 3, context: 3, paraphrase: 2 });
+  assert.deepEqual({ ...secCount(c, p, 'grammarReading') }, { grammar_form: 4, sentence_order: 2, text_grammar: 3, reading_short: 1, reading_mid: 2, info_search: 1 });
+  assert.deepEqual({ ...secCount(c, p, 'listening') }, { task: 3, point: 3, utterance: 2, response: 3 });
+  assert.equal(p.sections[0].seconds, 660); assert.equal(p.sections[1].seconds, 1440); assert.equal(p.sections[2].seconds, null);
+  assert.equal(p.fresh, true);
+  const tg = p.sections[1].qids.filter(id => id.startsWith('tg'));
+  assert.equal(new Set(tg.map(id => id.split('-')[0])).size, 1, '文章文法同一篇三題一起');
+  assert.ok(!p.sections.flatMap(s => s.qids).some(id => id.includes('-p')), '不用練習題');
+});
+
+test('assembleMock：考過的題目不再出；某題型新題不夠 → 用最早考過的補、fresh=false', async () => {
+  const c = await load(makeMockBank({ paraphraseMock: 3 }));
+  const p1 = c.JLPT.assembleMock({ level: 'N5', kind: 'mini', now: NOW });
+  c.Progress.saveJlpt(j => j.mocks.push({ at: NOW, level: 'N5', kind: 'mini', qids: p1.sections.flatMap(s => s.qids), answers: {} }));
+  const p2 = c.JLPT.assembleMock({ level: 'N5', kind: 'mini', now: NOW + 1 });
+  const used = new Set(p1.sections.flatMap(s => s.qids));
+  assert.ok(!p2.sections.flatMap(s => s.qids).some(id => used.has(id) && !id.startsWith('paraphrase')), '其他題型都換新題');
+  assert.equal(p2.fresh, false, 'paraphrase 模擬考題只剩 1 題，不夠');
+  assert.equal(secCount(c, p2, 'vocab').paraphrase, 2);
+});
+
+test('assembleMock full：官方題數與時間', async () => {
+  const c = await load(makeMockBank());
+  const p = c.JLPT.assembleMock({ level: 'N5', kind: 'full', now: NOW });
+  assert.equal(p.sections[0].seconds, 1200); assert.equal(p.sections[1].seconds, 2400);
+  assert.equal(p.sections[0].qids.length, 21);
+});
+
+test('考試狀態：開始、剩餘時間、暫停（聽解不能）、下一科不能回頭、重新整理時恢復或中斷', async () => {
+  const c = await load(makeMockBank()), J = c.JLPT;
+  const p = J.assembleMock({ level: 'N5', kind: 'mini', now: NOW });
+  let a = J.startAttempt(p, NOW);
+  assert.equal(J.timeLeft(NOW + 60e3), 600e3);
+  J.pauseAttempt(NOW + 60e3);
+  assert.equal(J.timeLeft(NOW + 600e3), 600e3, '暫停時時間不走');
+  J.resumeTimer(NOW + 600e3);
+  assert.equal(J.timeLeft(NOW + 660e3), 540e3);
+  assert.equal(J.attempt().everPaused, true);
+  J.nextSection(NOW + 700e3);
+  assert.equal(J.attempt().sectionIndex, 1);
+  assert.equal(J.timeLeft(NOW + 700e3), 1440e3);
+  a = J.resumeAttempt(NOW + 700e3 + 1441e3);
+  assert.equal(a.sectionIndex, 2, '時間到：恢復時自動交出這一科');
+  assert.equal(J.pauseAttempt(NOW + 2200e3), false, '聽解不能暫停');
+  J.saveAttempt({ ...J.attempt(), listenIndex: 3 });
+  assert.equal(J.resumeAttempt(NOW + 2300e3).interrupted, true, '聽解中途重新整理 → 中斷');
+  J.clearAttempt(); assert.equal(J.attempt(), null);
+});

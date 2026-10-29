@@ -133,7 +133,11 @@ export function buildLevel(batches, ctx, { audioExists = () => false, imageExist
       if (q.passage) {
         const p = passages[q.passage];
         if (!p) errs.push(`引用不存在的文章 ${q.passage}`);
-        else if (!checkedPassages.has(q.passage)) {
+        if (q.type === 'text_grammar') {
+          if (!Number.isInteger(q.blank)) errs.push('文章文法題要有 blank（對應文章裡的 {{#n}}）');
+          else if (p && !String(p.stem).includes(`{{#${q.blank}}}`)) errs.push(`文章 ${q.passage} 裡沒有方框 {{#${q.blank}}}`);
+        }
+        if (p && !checkedPassages.has(q.passage)) {
           checkedPassages.add(q.passage);
           for (const e of JLPT.textErrors(p.stem, PASSAGE_SECTION[q.type] || 'reading', q.level, ctx)) report.push(`${b.batch}/passage ${q.passage}: ${e}`);
         }

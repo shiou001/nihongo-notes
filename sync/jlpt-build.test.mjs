@@ -70,3 +70,14 @@ test('genChoices：長音只加在自然的位置（不在ん、っ、小字、�
   const all = ['先生/せんせい', '電車/でんしゃ', '白い/しろい'].flatMap(s => { const [w, r] = s.split('/'); return genChoices(w, r, 'kanji_reading', v, [], 'x').choices; });
   for (const bad of ['せいんせい', 'でいんしゃ', 'しろうい']) assert.ok(!all.includes(bad), bad);
 });
+
+test('buildLevel：文章文法題要有 blank，而且文章裡要有對應的方框', () => {
+  const b = { batch: 't', level: 'N5', reviewed: { by: 'x', at: 'd' }, passages: { p: { stem: 'あした　{{#1}}　いきます。' } }, questions: [
+    { id: 't-1', type: 'text_grammar', passage: 'p', blank: 1, choices: ['a', 'b', 'c', 'd'], answer: 1, explain: '…', pool: 'practice' },
+    { id: 't-2', type: 'text_grammar', passage: 'p', blank: 2, choices: ['a', 'b', 'c', 'd'], answer: 1, explain: '…', pool: 'practice' },
+    { id: 't-3', type: 'text_grammar', passage: 'p', choices: ['a', 'b', 'c', 'd'], answer: 1, explain: '…', pool: 'practice' }] };
+  const out = buildLevel([b], ctx(), {});
+  assert.deepEqual(out.questions.map(q => q.id), ['t-1']);
+  assert.ok(out.errors.some(e => e.includes('t-2') && /方框/.test(e)));
+  assert.ok(out.errors.some(e => e.includes('t-3') && /blank/.test(e)));
+});

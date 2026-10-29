@@ -35,14 +35,32 @@ window.JLPT = (() => {
   // ── 題目標記 ──
   //   {漢字|かんじ} 振假名　[[…]] 底線　{{_}} 排序空格　{{★}} ★空格　{{#22}} 方框號碼　空格用全形空白（分かち書き）
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  function renderStem(stem) {
-    return esc(stem)
+  //   | 開頭的行是表格（資訊檢索的告示、價目表）
+  //   opts.boxNo：文章裡的方框號碼 → 畫面上的題號；opts.current：目前這一題的方框
+  function renderStem(stem, { boxNo = {}, current = null } = {}) {
+    const inline = s => esc(s)
       .replace(/\{\{_\}\}/g, '<span class="ord-blank"></span>')
       .replace(/\{\{★\}\}/g, '<span class="ord-blank star">★</span>')
-      .replace(/\{\{#(\d+)\}\}/g, '<span class="box-no">$1</span>')
+      .replace(/\{\{#(\d+)\}\}/g, (m, n) => `<span class="box-no${+n === current ? ' current' : ''}">${boxNo[n] ?? n}</span>`)
       .replace(/\{([^{}|]+)\|([^{}|]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>')
-      .replace(/\[\[(.+?)\]\]/g, '<u>$1</u>')
-      .replace(/\n/g, '<br>');
+      .replace(/\[\[(.+?)\]\]/g, '<u>$1</u>');
+    // 先把表格裡的 {漢字|よみ} 換掉，避免和表格的 | 混在一起
+    const rubies = [];
+    const lines = String(stem ?? '').replace(/\{([^{}|]+)\|([^{}|]+)\}/g, m => `\u0000${rubies.push(m) - 1}\u0000`).split('\n');
+    const back = s => s.replace(/\u0000(\d+)\u0000/g, (m, i) => rubies[i]);
+    let out = '', prev = null, rows = [];
+    const flush = () => {
+      if (!rows.length) return;
+      out += (prev === 'text' ? '<br>' : '') + `<table class="notice">${rows.map((r, i) => `<tr>${r.map(c => i ? `<td>${inline(back(c))}</td>` : `<th>${inline(back(c))}</th>`).join('')}</tr>`).join('')}</table>`;
+      rows = []; prev = 'table';
+    };
+    for (const line of lines) {
+      if (/^\s*\|/.test(line)) { rows.push(line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim())); continue; }
+      flush();
+      out += (prev === 'text' ? '<br>' : '') + inline(back(line)); prev = 'text';
+    }
+    flush();
+    return out;
   }
 
   // ── 題目檢查 ──
@@ -168,6 +186,122 @@ window.JLPT = (() => {
     return out;
   }
 
+  // ── 組卷（規格 §7、§5.4）──
+  // 每個題型：先用沒考過的模擬考專用題 → 不夠用最早考過的模擬考題 → 再不夠用練習題；後兩種都讓 fresh=false
+  const SECTION_ORDER = ['vocab', 'grammarReading', 'listening'];
+  const FULL_SECONDS = { N5: { vocab: 1200, grammarReading: 2400 }, N4: { vocab: 1500, grammarReading: 3300 } };
+  const PER_ITEM = { vocab: 1200 / 21, grammarReading: 2400 / 22 }; // N5 每題平均秒數
+  function sectionSeconds(key, n, kind, level) {
+    if (key === 'listening') return null;
+    if (kind === 'full') return (FULL_SECONDS[level] || FULL_SECONDS.N5)[key];
+    return Math.ceil(n * PER_ITEM[key] / 60) * 60;
+  }
+  function groupUnits(qs) {
+    const units = [], byPassage = new Map();
+    for (const q of qs) {
+      if (!q.passage) { units.push([q]); continue; }
+      if (!byPassage.has(q.passage)) { byPassage.set(q.passage, []); units.push(byPassage.get(q.passage)); }
+      byPassage.get(q.passage).push(q);
+    }
+    return units;
+  }
+  function assembleMock({ level = settings().level, kind = 'mini', now = Date.now() } = {}) {
+    const usable = bank(level).questions.filter(q => !q.example && !isReported(q));
+    const lastSeen = new Map();
+    for (const m of P().jlpt().mocks) for (const id of m.qids || []) lastSeen.set(id, Math.max(lastSeen.get(id) || 0, m.at || 0));
+    const seenAt = u => Math.max(...u.map(q => lastSeen.get(q.id) || 0));
+    let fresh = true;
+    const sections = [];
+    for (const key of SECTION_ORDER) {
+      const qids = [];
+      for (const type of SECTIONS[key]) {
+        const need = kind === 'full' ? TYPES[type].full[level] || 0 : TYPES[type].mini;
+        if (!need) continue;
+        const units = groupUnits(usable.filter(q => q.type === type));
+        const tiers = [
+          units.filter(u => u[0].pool === 'mock' && !seenAt(u)),
+          units.filter(u => u[0].pool === 'mock' && seenAt(u)).sort((a, b) => seenAt(a) - seenAt(b)),
+          units.filter(u => u[0].pool === 'practice'),
+        ];
+        let got = 0;
+        tiers.forEach((tier, t) => {
+          for (const u of tier) {
+            if (got >= need) break;
+            if (got > 0 && got + u.length > need) continue; // 文章題整組出；已經有題目時不硬塞超過的組
+            qids.push(...u.map(q => q.id)); got += u.length;
+            if (t > 0) fresh = false;
+          }
+        });
+        if (got < need) fresh = false;
+      }
+      if (qids.length) sections.push({ key, qids, seconds: sectionSeconds(key, qids.length, kind, level) });
+    }
+    return { level, kind, fresh, sections };
+  }
+
+  // ── 考試進行中的狀態（只存在這台裝置）──
+  const ATTEMPT_KEY = 'nihongo.jlpt.attempt';
+  function attempt() { try { return JSON.parse(localStorage.getItem(ATTEMPT_KEY)) || null; } catch { return null; } }
+  function saveAttempt(a) { try { localStorage.setItem(ATTEMPT_KEY, JSON.stringify(a)); } catch {} return a; }
+  function clearAttempt() { try { localStorage.setItem(ATTEMPT_KEY, 'null'); localStorage.removeItem?.(ATTEMPT_KEY); } catch {} }
+  const deadlineFor = (sec, now) => (sec && sec.seconds ? now + sec.seconds * 1000 : null);
+  const currentSection = a => a && a.plan.sections[a.sectionIndex];
+  function startAttempt(plan, now = Date.now()) {
+    return saveAttempt({ plan, startedAt: now, sectionIndex: 0, deadline: deadlineFor(plan.sections[0], now), remainingMs: null, paused: false, everPaused: false, answers: {}, listenIndex: 0, interrupted: false });
+  }
+  function timeLeft(now = Date.now()) {
+    const a = attempt();
+    if (!a) return 0;
+    if (a.paused) return a.remainingMs;
+    return a.deadline == null ? null : Math.max(0, a.deadline - now);
+  }
+  function pauseAttempt(now = Date.now()) {
+    const a = attempt(), sec = currentSection(a);
+    if (!sec || sec.key === 'listening' || a.paused || a.deadline == null) return false;
+    Object.assign(a, { remainingMs: Math.max(0, a.deadline - now), paused: true, everPaused: true });
+    saveAttempt(a); return true;
+  }
+  function resumeTimer(now = Date.now()) {
+    const a = attempt();
+    if (!a || !a.paused) return a;
+    return saveAttempt(Object.assign(a, { deadline: now + a.remainingMs, remainingMs: null, paused: false }));
+  }
+  // 交出這一科、進入下一科（不能回頭）
+  function nextSection(now = Date.now()) {
+    const a = attempt();
+    if (!a) return null;
+    a.sectionIndex++; a.paused = false; a.remainingMs = null; a.listenIndex = 0;
+    a.deadline = deadlineFor(currentSection(a), now);
+    return saveAttempt(a);
+  }
+  function setAnswer(qid, v) {
+    const a = attempt(), sec = currentSection(a);
+    if (!sec || !sec.qids.includes(qid)) return false; // 只能改目前這一科
+    a.answers[qid] = v; saveAttempt(a); return true;
+  }
+  // 中途結束考試：留下紀錄（不計入畢業），清掉進行中的狀態
+  function abandonAttempt(now = Date.now()) {
+    const a = attempt();
+    if (!a) return null;
+    const mock = { at: now, level: a.plan.level, kind: a.plan.kind, qids: a.plan.sections.flatMap(s => s.qids), answers: a.answers, abandoned: true, counted: false, paused: !!a.everPaused, interrupted: !!a.interrupted };
+    P().saveJlpt(j => { j.mocks.push(mock); });
+    clearAttempt();
+    return mock;
+  }
+  // 回到考試頁（重新整理、離開後回來）：時間到的科目自動交出；聽解中途離開就算中斷，不計入畢業
+  function resumeAttempt(now = Date.now()) {
+    let a = attempt();
+    while (a && !a.paused) {
+      const sec = currentSection(a);
+      if (!sec || sec.key === 'listening' || a.deadline == null || now < a.deadline) break;
+      a = nextSection(now);
+    }
+    const sec = currentSection(a);
+    if (a && sec && sec.key === 'listening' && a.listenIndex > 0 && !a.interrupted) a = saveAttempt({ ...a, interrupted: true });
+    return a;
+  }
+
   return { LEVELS, TYPES, SECTIONS, PASSAGE_TYPES, renderStem, validate, textErrors, esc,
-    DEFAULTS, settings, setSettings, bank, qid, daysLeft, isReported, report, typeStats, dailySet };
+    DEFAULTS, settings, setSettings, bank, qid, daysLeft, isReported, report, typeStats, dailySet,
+    assembleMock, attempt, saveAttempt, clearAttempt, startAttempt, timeLeft, pauseAttempt, resumeTimer, nextSection, setAnswer, resumeAttempt, currentSection, abandonAttempt };
 })();
