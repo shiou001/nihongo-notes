@@ -369,3 +369,42 @@ test('JLPT 成績頁：交完全部科目 → 估計分數與說明、不計入�
   assert.ok(a.document.querySelector('a[href="#/jlpt/mock"]'));
   assert.ok(!a.document.querySelector('main').innerHTML.includes('undefined'));
 });
+
+// 聽解題要等 Task 14 才有真的題目：測試時先放幾題假的進題庫
+function addListening(ctx) {
+  const qs = ctx.NIHONGO_JLPT.levels.N5.questions;
+  const mk = (type, i, pool) => ({ id: `t-${type}-${pool}-${i}`, level: 'N5', type, section: 'listening', pool, rev: 1,
+    script: type === 'response' ? [['F', 'お{国|くに}は　どちらですか。']] : type === 'utterance' ? [['N', 'みせの　ひとを　よびます。なんと　いいますか。']] : [['N', 'しつもん'], ['M', 'はなし'], ['N', 'しつもん']],
+    speaker: type === 'utterance' || type === 'response' ? 'M' : undefined,
+    choices: type === 'utterance' || type === 'response' ? ['あちらです。', 'アメリカです。', 'へやです。'] : ['えき', 'がっこう', 'こうえん', 'びょういん'], answer: 2, explain: '…' });
+  for (const type of ['task', 'point', 'utterance', 'response']) { for (let i = 1; i <= 4; i++) qs.push(mk(type, i, 'mock')); for (let i = 1; i <= 2; i++) qs.push(mk(type, i, 'practice')); }
+}
+
+test('JLPT 聽解（考試模式）：開始鈕、不能暫停也不能提早交卷、即時應答只有メモ和 3 個圓圈、發話表現不印選項', async () => {
+  const a = await app('#/jlpt/mock');
+  addListening(a.ctx);
+  a.route('#/jlpt/mock');
+  a.click('[data-jlpt-start][data-kind="mini"]');
+  a.click('[data-jlpt-submit-section]'); a.click('[data-jlpt-submit-section]');
+  assert.equal(a.ctx.JLPT.currentSection(a.ctx.JLPT.attempt()).key, 'listening');
+  assert.ok(a.document.querySelector('[data-jlpt-listen-start]'));
+  assert.equal(a.document.querySelector('[data-jlpt-pause]'), null);
+  assert.equal(a.document.querySelector('[data-jlpt-submit-section]'), null);
+  assert.equal(a.document.querySelector('#jlpt-exam [data-jlpt-listen]'), null, '考試中沒有重播鈕');
+  const res = a.document.querySelector('#jlpt-exam .q[data-type="response"]:not(.example)');
+  assert.match(res.textContent, /メモ/); assert.equal(res.querySelectorAll('.bub').length, 3);
+  assert.equal(a.document.querySelector('#jlpt-exam .q[data-type="utterance"] .choices'), null);
+  assert.ok([...a.document.querySelectorAll('#jlpt-exam .q:not(.example) .bub')].every(b => b.disabled), '還沒開始播放前不能作答');
+});
+
+test('JLPT 聽解（練習模式）：有播放鈕；作答後顯示腳本，可以再聽一次', async () => {
+  const a = await app('#/jlpt/daily');
+  addListening(a.ctx);
+  const q = a.ctx.JLPT.bank('N5').questions.find(x => x.id === 't-task-practice-1');
+  a.ctx.localStorage.setItem('nihongo.jlpt.daily', JSON.stringify({ day: a.ctx.Progress.dayKey(), level: 'N5', ids: [q.id], i: 0, results: {}, ended: false }));
+  a.route('#/jlpt/daily');
+  assert.ok(a.document.querySelector('#jlpt-daily [data-jlpt-listen]'));
+  a.click('#jlpt-daily .q .bub[data-v="2"]');
+  assert.ok(a.document.querySelector('#jlpt-daily .explain .script'));
+  assert.match(a.document.querySelector('#jlpt-daily [data-jlpt-listen]').textContent, /再聽一次/);
+});

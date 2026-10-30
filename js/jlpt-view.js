@@ -16,24 +16,31 @@ window.JLPTView = (() => {
   // ── 題目（題本風格）──
   // mode：practice 每日練習（作答後立刻看詳解）／exam 考試模式（Task 8）
   // mode：example 大題開頭的（れい），答案已塗好、不能按
-  function questionHtml(q, { mode = 'practice', number = 1, chosen = null, reveal = false } = {}) {
-    const locked = reveal || mode === 'example';
-    const t = J().TYPES[q.type];
+  //   listenLocked：考試中的聽解，還沒輪到這一題時不能作答；current：正在播的這一題
+  const ROLE_NAME = { N: '旁白', M: '男', F: '女' };
+  function questionHtml(q, { mode = 'practice', number = 1, chosen = null, reveal = false, listenLocked = false, current = false } = {}) {
+    const locked = reveal || mode === 'example' || listenLocked;
+    const t = J().TYPES[q.type], listening = t.section === 'listening';
     const plain = s => String(s).replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1');
     const long = q.choices.some(c => [...plain(c)].length > 8);
-    const spoken = q.type === 'utterance' || q.type === 'response'; // 選項只用聽的，題本上不印
-    const choices = spoken ? '' : `<ol class="choices ${long ? 'grid2' : 'row4'}">${q.choices.map((c, i) => `<li><span class="cn">${i + 1}</span><span lang="ja">${J().renderStem(c)}</span></li>`).join('')}</ol>`;
+    // 發話表現、即時應答的選項只用聽的；有插圖的聽解題，選項就是插圖上的編號
+    const printed = !(q.type === 'utterance' || q.type === 'response' || (listening && q.figure));
+    const choices = printed ? `<ol class="choices ${long ? 'grid2' : 'row4'}">${q.choices.map((c, i) => `<li><span class="cn">${i + 1}</span><span lang="ja">${J().renderStem(c)}</span></li>`).join('')}</ol>` : '';
+    const figure = listening && q.figure && window.JLPTFigure ? `<div class="figure">${JLPTFigure.render(q.figure)}</div>` : '';
+    const memo = q.type === 'response' ? '<div class="memo">－ メモ －</div>' : '';
+    const play = listening && mode !== 'exam' && mode !== 'example' ? `<p><button type="button" class="btn small" data-jlpt-listen="${esc(q.id)}">${icon('speaker-high')} ${reveal ? '再聽一次' : '播放'}</button></p>` : '';
+    const script = listening && reveal ? `<div class="script" lang="ja">${J().listeningLines(q).map(([r, s]) => `<p><b>${ROLE_NAME[r] || r}</b>${J().renderStem(s)}</p>`).join('')}</div>` : '';
     const bubs = q.choices.map((c, i) => {
       const v = i + 1, cls = [chosen === v ? 'on' : '', reveal && v === q.answer ? 'ok' : '', reveal && chosen === v && v !== q.answer ? 'ng' : ''].filter(Boolean).join(' ');
       return `<button type="button" class="bub ${cls}" data-v="${v}" aria-label="選 ${v}" ${locked ? 'disabled' : ''}>${v}</button>`;
     }).join('');
     const reported = J().isReported(q);
-    const explain = reveal ? `<div class="explain" role="status"><p><b>${chosen === q.answer ? '○ 答對了' : `× 正確答案是 ${q.answer}`}</b></p><p>${esc(q.explain)}</p>
+    const explain = reveal ? `<div class="explain" role="status"><p><b>${chosen === q.answer ? '○ 答對了' : `× 正確答案是 ${q.answer}`}</b></p>${script}<p>${esc(q.explain)}</p>
       <button type="button" class="link-btn" data-jlpt-report ${reported ? 'disabled' : ''}>${reported ? '已回報，這題會先停止出題' : '回報題目有問題'}</button></div>` : '';
-    return `<article class="q${mode === 'example' ? ' example' : ''}" data-qid="${esc(q.id)}" data-section="${t.section}" data-type="${q.type}" data-mode="${mode}">
+    return `<article class="q${mode === 'example' ? ' example' : ''}${current ? ' current' : ''}" data-qid="${esc(q.id)}" data-section="${t.section}" data-type="${q.type}" data-mode="${mode}">
       <div class="qhead"><span class="qno">${number}</span>${mode === 'practice' ? `<span class="qtype">${esc(t.label)}</span>` : ''}</div>
       ${q.stem ? `<p class="stem" lang="ja">${J().renderStem(q.stem)}</p>` : ''}
-      ${choices}
+      ${play}${figure}${choices}${memo}
       <div class="sheet" role="group" aria-label="答案卡"><span class="sheet-label">かいとう</span>${bubs}</div>
       ${explain}</article>`;
   }
@@ -109,13 +116,47 @@ window.JLPTView = (() => {
       <div class="jlpt-grid">${card(mini, 'mini', '小型模擬考', '每種題型 2–3 題，適合週末練習。')}${card(full, 'full', '全真模擬考', '題數、時間都和正式考試一樣。')}</div>`;
   }
 
+  // ── 聽解（考試模式）：每個大題 作答說明 → 例題 → 每一題（提問、對話、再問一次、作答時間），一路播到最後 ──
+  let listen = { player: null, running: false, blocked: false };
+  const lineFiles = q => J().listeningLines(q).map(([r, t]) => J().audioFile(r, t));
+  function listenItems(a) {
+    const sec = J().currentSection(a), b = J().bank(a.plan.level), map = new Map(b.questions.map(q => [q.id, q]));
+    const items = [];
+    for (const type of J().SECTIONS.listening) {
+      const group = sec.qids.map(id => map.get(id)).filter(q => q && q.type === type);
+      if (!group.length) continue;
+      items.push({ kind: 'instr', files: [J().audioFile(...J().instructionLine(type))], tail: 1000 });
+      const ex = b.questions.find(q => q.type === type && q.example);
+      if (ex) items.push({ kind: 'example', id: ex.id, files: lineFiles(ex), tail: 1500 });
+      for (const q of group) items.push({ kind: 'q', id: q.id, files: lineFiles(q), tail: type === 'task' || type === 'point' ? 8000 : 5000 });
+    }
+    return items;
+  }
+  function stopListening() { listen.player?.stop(); listen = { player: null, running: false, blocked: false }; }
+  function runItem(k) {
+    const a = J().attempt(), items = a && listenItems(a);
+    if (!items || typeof window.Audio !== 'function') return;
+    if (k >= items.length) { stopListening(); J().nextSection(); renderMock(); window.scrollTo?.(0, 0); return; }
+    J().saveAttempt({ ...a, listenIndex: k });
+    listen.running = true; listen.blocked = false;
+    renderMock();
+    document.querySelector('#jlpt-exam .q.current, #jlpt-exam .mondai-head.current')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    listen.player = JLPTPlayer.play(items[k].files, { tailMs: items[k].tail, onEnd: () => runItem(k + 1), onBlocked: () => { listen.blocked = true; renderMock(); } });
+  }
+
   // 一科的題目：依題型分成大題（もんだい１、２…），每個大題開頭有作答說明和例題；題號在這一科裡連續
   function sectionBody(a) {
     const sec = J().currentSection(a), b = J().bank(a.plan.level);
     const map = new Map(b.questions.map(q => [q.id, q]));
     const qs = sec.qids.map(id => map.get(id)).filter(Boolean);
     const numberOf = id => sec.qids.indexOf(id) + 1;
+    const isListening = sec.key === 'listening';
+    const currentId = isListening && listen.running ? listenItems(a)[a.listenIndex]?.id : null;
     let html = '', mondai = 0;
+    if (isListening) html += listen.blocked
+      ? '<div class="listen-start"><button type="button" class="btn primary" data-jlpt-listen-resume>▶ 點一下開始播放</button><p class="meta">瀏覽器需要你點一下才能播放聲音。</p></div>'
+      : listen.running ? '' : `<div class="listen-start"><button type="button" class="btn primary" data-jlpt-listen-start>▶ ${a.listenIndex > 0 ? '從這一題繼續聽解' : '開始聽解'}</button>
+        <p class="meta">聽解開始後會一直播到最後，<b>不能暫停、不能重播</b>。請先確認聲音開著。題本上可以寫筆記。</p>${a.interrupted ? '<p class="meta">上次聽解中途離開，這次成績不計入畢業。</p>' : ''}</div>`;
     for (const type of J().SECTIONS[sec.key]) {
       const group = qs.filter(q => q.type === type);
       if (!group.length) continue;
@@ -126,7 +167,7 @@ window.JLPTView = (() => {
       const shown = new Set();
       for (const q of group) {
         if (q.passage && !shown.has(q.passage)) { shown.add(q.passage); html += passageHtml(q, a.plan.level, numberOf).replace('class="passage"', 'class="passage group"'); }
-        html += questionHtml(q, { mode: 'exam', number: numberOf(q.id), chosen: a.answers[q.id] ?? null });
+        html += questionHtml(q, { mode: 'exam', number: numberOf(q.id), chosen: a.answers[q.id] ?? null, listenLocked: isListening && q.id !== currentId, current: q.id === currentId });
       }
     }
     return html;
@@ -259,9 +300,17 @@ window.JLPTView = (() => {
 
   function render() {
     if (!el) return;
-    stopTimer();
+    stopTimer(); stopListening(); stopPractice();
     if (view === 'mock') return renderMock();
     el.innerHTML = view === 'daily' ? viewDaily() : view === 'settings' ? viewSettings() : view === 'result' ? viewResult(resultAt) : viewHome();
+  }
+  let practicePlayer = null;
+  function stopPractice() { practicePlayer?.stop(); practicePlayer = null; }
+  function practiceListen(id) {
+    const q = J().bank(J().settings().level).questions.find(x => x.id === id) || Progress.jlpt().mocks.map(m => J().bank(m.level).questions.find(x => x.id === id)).find(Boolean);
+    if (!q || typeof window.Audio !== 'function') return;
+    stopPractice();
+    practicePlayer = JLPTPlayer.play(lineFiles(q), {});
   }
   function examClick(e) {
     const start = e.target.closest('[data-jlpt-start]');
@@ -270,9 +319,12 @@ window.JLPTView = (() => {
     const bub = e.target.closest('#jlpt-exam .q:not(.example) .bub');
     if (bub && !bub.disabled) {
       const box = bub.closest('.q'), v = +bub.dataset.v;
+      if (J().currentSection(J().attempt())?.key === 'listening' && !box.classList.contains('current')) return true;
       if (J().setAnswer(box.dataset.qid, v)) box.querySelectorAll('.bub').forEach(x => x.classList.toggle('on', +x.dataset.v === v));
       return true;
     }
+    if (e.target.closest('[data-jlpt-listen-start]')) { runItem(J().attempt()?.listenIndex || 0); return true; }
+    if (e.target.closest('[data-jlpt-listen-resume]')) { listen.blocked = false; renderMock(); listen.player?.resume(); return true; }
     if (e.target.closest('[data-jlpt-pause]')) { J().pauseAttempt(); renderMock(); return true; }
     if (e.target.closest('[data-jlpt-resume]')) { J().resumeTimer(); renderMock(); return true; }
     if (e.target.closest('[data-jlpt-submit-section]')) {
@@ -281,7 +333,7 @@ window.JLPTView = (() => {
     }
     if (e.target.closest('[data-jlpt-abandon]')) {
       if (!ask('結束這次模擬考？這次的成績不會計入畢業。')) return true;
-      J().abandonAttempt(); notice = '已結束這次模擬考（不計入畢業）。'; renderMock(); return true;
+      stopListening(); J().abandonAttempt(); notice = '已結束這次模擬考（不計入畢業）。'; renderMock(); return true;
     }
     return false;
   }
@@ -292,6 +344,8 @@ window.JLPTView = (() => {
     if (bound) return; bound = true;
     document.addEventListener('click', e => {
       if (view === 'mock' && examClick(e)) return;
+      const pl = e.target.closest('[data-jlpt-listen]');
+      if (pl) { practiceListen(pl.dataset.jlptListen); return; }
       const rr = e.target.closest('#jlpt-result [data-jlpt-report]');
       if (rr) {
         const id = rr.closest('.q')?.dataset.qid, m = findMock(resultAt), q = m && J().bank(m.level).questions.find(x => x.id === id);
@@ -333,5 +387,8 @@ window.JLPTView = (() => {
     return `<a class="play-card jlpt-today" href="#/jlpt/daily"><span class="glyph" aria-hidden="true" lang="ja">試</span><p class="eyebrow">JLPT・${days >= 0 ? `距離考試 ${days} 天` : '設定考試日期'}</p><b>每日 20 題</b><small>今天 ${dailyDone(d)} / ${d.ids.length} 題</small></a>`;
   }
 
-  return { mount, todayCard, questionHtml, passageHtml };
+  // 離開 JLPT 頁面時停止播放（app.js 的 route() 每次換頁都會呼叫；回到考試時聽解算中斷）
+  function leave() { stopListening(); stopPractice(); stopTimer(); }
+
+  return { mount, leave, todayCard, questionHtml, passageHtml };
 })();

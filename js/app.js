@@ -920,6 +920,7 @@
     quiz.qs = []; quiz.unitKey = ''; game.kind = '';
     document.querySelectorAll('nav.top a').forEach(a => { const active = a.dataset.view === navView; a.classList.toggle('active', active); if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     window.scrollTo(0, 0);
+    window.JLPTView?.leave();
     switch (view) {
       case 'map': case 'course': app().innerHTML = viewCourse(seg[1] || ''); break;
       case 'unit': app().innerHTML = viewUnit(decodeURIComponent(seg[1] || '')); break;

@@ -91,3 +91,13 @@
 /* 成績頁 */
 .review-title { margin: 28px 0 4px; }
 .mock-list { margin: 4px 0 0; padding-left: 1.2em; }
+
+/* 聽解 */
+.exam .listen-start { border: 1.6px dashed var(--e-ink); padding: 14px 16px; margin: 0 0 18px; text-align: center; }
+.exam .q.current { outline: 2.5px solid var(--e-ink); outline-offset: 6px; }
+.exam .memo { border: 1px solid var(--e-line); min-height: 80px; padding: 6px 10px; color: var(--e-gray); text-align: center; margin: 6px 0 12px; }
+.exam .figure { margin: 6px 0 12px; }
+.exam .figure svg, .exam .figure img { max-width: 100%; height: auto; display: block; }
+.exam .script { background: #fff; border: 1px solid var(--e-line); padding: 6px 10px; margin: 6px 0; font-family: "BIZ UDPGothic", sans-serif; }
+.exam .script p { margin: 2px 0; }
+.exam .script b { display: inline-block; min-width: 2.6em; color: var(--e-gray); font-weight: 400; }
