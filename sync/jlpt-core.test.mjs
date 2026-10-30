@@ -303,3 +303,34 @@ test('assembleMock：題庫裡完全沒有的題型（例如聽解還沒做）�
   assert.deepEqual([...p.sections.map(s => s.key)], ['vocab', 'grammarReading']);
   assert.equal(p.fresh, true);
 });
+
+// ── Task 11：聽解錄音的檔名與播放順序 ──
+test('audioFile：檔名包含聲音和文字，和 tools/make-audio.mjs 的 audioKey 一致', async () => {
+  const { audioKey } = await import('../tools/make-audio.mjs');
+  const { JLPT } = await load(makeBank());
+  assert.equal(JLPT.audioFile('F', 'はい。'), `audio/jlpt/${audioKey('108|はい。')}.mp3`);
+  assert.equal(JLPT.audioFile('N', 'はい。'), `audio/jlpt/${audioKey('30|はい。')}.mp3`);
+  assert.notEqual(JLPT.audioFile('M', 'はい。'), JLPT.audioFile('F', 'はい。'), '同一句不同聲音是不同的檔');
+  assert.equal(JLPT.speechText('{今日|きょう}は　いい　{天気|てんき}です。'), 'きょうは いい てんきです。');
+});
+
+test('listeningLines：課題理解照腳本；發話表現、即時應答把選項唸出來', async () => {
+  const { JLPT } = await load(makeBank());
+  const task = { type: 'task', script: [['N', 'しつもん'], ['M', 'a'], ['F', 'b'], ['N', 'しつもん']], choices: ['1', '2', '3', '4'] };
+  assert.deepEqual([...JLPT.listeningLines(task).map(l => l[0])], ['N', 'M', 'F', 'N']);
+  const utt = { type: 'utterance', speaker: 'F', script: [['N', 'レストランで　店の　人を　呼びます。何と　言いますか。']], choices: ['いらっしゃいませ。', 'すみません。', 'ごちそうさまでした。'] };
+  assert.deepEqual([...JLPT.listeningLines(utt).map(l => l.join('|'))], ['N|レストランで　店の　人を　呼びます。何と　言いますか。', 'F|一、いらっしゃいませ。', 'F|二、すみません。', 'F|三、ごちそうさまでした。']);
+  const res = { type: 'response', speaker: 'M', script: [['F', 'お{国|くに}は　どちらですか。']], choices: ['あちらです。', 'アメリカです。', 'へやです。'] };
+  assert.deepEqual([...JLPT.listeningLines(res).map(l => l[0])], ['F', 'M', 'M', 'M']);
+});
+
+test('validate：課題理解、重點理解的腳本前後都要是旁白提問；發話表現、即時應答要有 speaker', async () => {
+  const { JLPT } = await load();
+  const base = { id: 'l', level: 'N5', section: 'listening', choices: ['a', 'b', 'c', 'd'], answer: 1, explain: '…', pool: 'practice', rev: 1 };
+  const c = () => ({ kanjiLevel: new Map(), ids: new Set() });
+  assert.deepEqual([...JLPT.validate({ ...base, type: 'task', script: [['N', 'q'], ['M', 'a'], ['N', 'q']] }, c())], []);
+  assert.ok(JLPT.validate({ ...base, type: 'task', script: [['M', 'a'], ['N', 'q']] }, c()).some(e => /旁白/.test(e)));
+  assert.ok(JLPT.validate({ ...base, type: 'point', script: [['N', 'q'], ['M', 'a']] }, c()).some(e => /旁白/.test(e)));
+  assert.ok(JLPT.validate({ ...base, type: 'response', choices: ['a', 'b', 'c'], script: [['F', 'q']] }, c()).some(e => /speaker/.test(e)));
+  assert.ok(JLPT.validate({ ...base, type: 'task', script: [['N', 'q'], ['X', 'a'], ['N', 'q']] }, c()).some(e => /角色/.test(e)));
+});

@@ -63,6 +63,30 @@ window.JLPT = (() => {
     return out;
   }
 
+  // ── 聽解錄音（tools/make-jlpt-audio.mjs 產生）──
+  // 角色 → VOICEVOX 聲音：N 旁白 No.7（アナウンス）、M 男 剣崎雌雄、F 女 東北きりたん
+  const voices = () => window.NIHONGO_JLPT?.voices || { N: 30, M: 21, F: 108 };
+  // 跟 js/voice.js、tools/make-audio.mjs 的 audioKey 一樣（FNV-1a）
+  const audioKey = t => {
+    const s = String(t ?? '').normalize('NFKC').trim();
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(36);
+  };
+  // 同一句台詞用不同聲音唸是不同的檔，所以檔名包含聲音
+  const audioFile = (role, text) => `audio/jlpt/${audioKey(`${voices()[role]}|${text}`)}.mp3`;
+  // 唸給 VOICEVOX 的文字：振假名換成讀音、全形空白換成半形
+  const speechText = t => String(t ?? '').replace(/\{([^{}|]+)\|([^{}|]+)\}/g, '$2').replace(/　/g, ' ').trim();
+  const NUMS = ['一、', '二、', '三、', '四、'];
+  // 一題聽解的完整播放順序（〔角色, 台詞〕）
+  function listeningLines(q) {
+    const lines = [...(q.script || [])];
+    if (q.type === 'utterance' || q.type === 'response') q.choices.forEach((c, i) => lines.push([q.speaker, NUMS[i] + c]));
+    return lines;
+  }
+  // 大題的作答說明（旁白唸）
+  const instructionLine = type => ['N', TYPES[type].instruction];
+
   // ── 題目檢查 ──
   const KANJI = /[一-鿿々]/g;
   const RUBY = /\{([^{}|]+)\|([^{}|]+)\}/g;
@@ -99,6 +123,12 @@ window.JLPT = (() => {
     if (PASSAGE_TYPES.includes(q.type) && !q.passage) errs.push('文章題要有 passage');
     if (t.section === 'listening') {
       if (!Array.isArray(q.script) || !q.script.length || q.script.some(l => !Array.isArray(l) || l.length < 2)) errs.push('聽解題要有 script（〔角色, 台詞〕）');
+      else {
+        const roles = Object.keys(voices());
+        if (q.script.some(([r]) => !roles.includes(r))) errs.push(`不認識的角色（可用：${roles.join('、')}）`);
+        if ((q.type === 'task' || q.type === 'point') && (q.script[0][0] !== 'N' || q.script.at(-1)[0] !== 'N')) errs.push('課題理解、重點理解的腳本要由旁白（N）提問開始、再由旁白提問結束');
+        if ((q.type === 'utterance' || q.type === 'response') && !roles.includes(q.speaker)) errs.push('發話表現、即時應答要有 speaker（唸選項的角色）');
+      }
     } else {
       if (!PASSAGE_TYPES.includes(q.type) && !String(q.stem ?? '').trim()) errs.push('沒有題目');
       errs.push(...textErrors(q.stem, t.section, q.level, ctx));
@@ -366,5 +396,6 @@ window.JLPT = (() => {
   return { LEVELS, TYPES, SECTIONS, PASSAGE_TYPES, renderStem, validate, textErrors, esc,
     DEFAULTS, settings, setSettings, bank, qid, daysLeft, isReported, report, typeStats, dailySet,
     assembleMock, attempt, saveAttempt, clearAttempt, startAttempt, timeLeft, pauseAttempt, resumeTimer, nextSection, setAnswer, resumeAttempt, currentSection, abandonAttempt,
-    score, weekKey, finishAttempt, graduation, mockPoolLeft, PASS_TOTAL };
+    score, weekKey, finishAttempt, graduation, mockPoolLeft, PASS_TOTAL,
+    voices, audioKey, audioFile, speechText, listeningLines, instructionLine };
 })();

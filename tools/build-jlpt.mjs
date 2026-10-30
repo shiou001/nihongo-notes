@@ -6,7 +6,7 @@
 //   • 已審查的題目有錯 → 印出錯誤並以 1 結束；未審查批次的錯誤只當警告
 // 批次格式與流程見 jlpt-src/README.md
 import { readFile, readdir, writeFile, access } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -173,8 +173,9 @@ async function main() {
     const batches = [];
     // 級數取資料夾名稱（jlpt-src/n5/ → N5），批次檔可以不寫 level
     for (const f of files) batches.push({ batch: f.replace(/\.json$/, ''), level, ...JSON.parse(await readFile(path.join(dir, f), 'utf8')) });
-    // 錄音、插圖檢查在 tools/make-jlpt-audio.mjs、tools/jlpt-img.mjs 完成後接上（見實作計畫 Task 11、13）
-    const out = buildLevel(batches, ctx, {});
+    // 聽解題：每一句台詞都要有錄音（tools/make-jlpt-audio.mjs），缺錄音的題目不輸出
+    const audioExists = q => JLPT.listeningLines(q).every(([r, t]) => existsSync(path.join(root, JLPT.audioFile(r, t))));
+    const out = buildLevel(batches, ctx, { audioExists });
     for (const w of out.warnings) console.warn('警告（未審查）', w);
     for (const e of out.errors) console.error('錯誤', e);
     blocking += out.errors.length;
