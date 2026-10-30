@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 const run = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SIZE = { objects: 'scale=-2:240', scenes: 'scale=900:-2' };
+// 情境圖上方留白 80px：箭頭從人物頭上指下來時才不會被切掉
+const SIZE = { objects: 'scale=-2:240', scenes: 'scale=900:-2,pad=iw:ih+80:0:80:white' };
 
 export function ffmpegArgs(input, output, kind, crop = '') {
   if (!SIZE[kind]) throw new Error('--kind 要是 objects 或 scenes');

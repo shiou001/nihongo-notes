@@ -75,17 +75,18 @@ window.JLPT = (() => {
   };
   // 同一句台詞用不同聲音唸是不同的檔，所以檔名包含聲音
   const audioFile = (role, text) => `audio/jlpt/${audioKey(`${voices()[role]}|${text}`)}.mp3`;
-  // 唸給 VOICEVOX 的文字：振假名換成讀音、全形空白換成半形
-  const speechText = t => String(t ?? '').replace(/\{([^{}|]+)\|([^{}|]+)\}/g, '$2').replace(/　/g, ' ').trim();
-  const NUMS = ['一、', '二、', '三、', '四、'];
+  // 唸給 VOICEVOX 的文字：振假名換成讀音；詞語間的空格拿掉（空格會讓語音不自然地停頓）
+  const speechText = t => String(t ?? '').replace(/\{([^{}|]+)\|([^{}|]+)\}/g, '$2').replace(/[　 ]+/g, '').trim();
+  const NUMS = ['いち、', 'に、', 'さん、', 'よん、']; // 選項號碼（唸成いち、に、さん）
   // 一題聽解的完整播放順序（〔角色, 台詞〕）
   function listeningLines(q) {
     const lines = [...(q.script || [])];
     if (q.type === 'utterance' || q.type === 'response') q.choices.forEach((c, i) => lines.push([q.speaker, NUMS[i] + c]));
     return lines;
   }
-  // 大題的作答說明（旁白唸）
-  const instructionLine = type => ['N', TYPES[type].instruction];
+  // 大題的作答說明（旁白唸）：題本上的數字和箭頭符號換成唸法
+  const SPOKEN_DIGIT = { '１': 'いち', '２': 'に', '３': 'さん', '４': 'よん' };
+  const instructionLine = type => ['N', TYPES[type].instruction.replace('➡（やじるし）', 'やじるし').replace(/[１-４]/g, d => SPOKEN_DIGIT[d])];
 
   // ── 題目檢查 ──
   const KANJI = /[一-鿿々]/g;

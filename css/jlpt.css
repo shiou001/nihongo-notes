@@ -110,10 +110,11 @@
 .exam .fig-grid .things img { height: 64px; width: auto; }
 .exam .fig-grid.clocks svg { width: 110px; height: 110px; }
 .exam .fig-map, .exam .fig-cal { border: 1.6px solid var(--e-ink); background: #fff; }
-.exam .fig-scene { position: relative; border: 1.6px solid var(--e-ink); background: #fff; display: flex; justify-content: center; overflow: hidden; }
-.exam .fig-scene img { max-height: 340px; width: auto; max-width: 100%; }
+/* 情境圖：外框縮到和圖一樣大，箭頭的百分比位置才會對準圖上的人 */
+.exam .fig-scene { position: relative; border: 1.6px solid var(--e-ink); background: #fff; width: fit-content; max-width: 100%; margin: 0 auto; overflow: hidden; }
+.exam .fig-scene img { display: block; max-height: 340px; width: auto; max-width: 100%; }
 .exam .arrow-pin { position: absolute; width: 0; height: 0; }
-.exam .arrow-pin svg.arrow { position: absolute; width: 52px; height: 52px; top: -48px; }
+.exam .arrow-pin svg.arrow { position: absolute; width: 52px; height: 52px; max-width: none; top: -48px; }
 .exam .arrow-pin svg.down-right { left: -48px; }
 .exam .arrow-pin svg.down-left { left: -4px; transform: scaleX(-1); }
 @media (max-width: 600px) { .exam .fig-grid .cell { min-height: 100px; } .exam .fig-grid .things img { height: 46px; } .exam .fig-scene img { max-height: 240px; } }

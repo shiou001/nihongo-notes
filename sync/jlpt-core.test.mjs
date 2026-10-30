@@ -311,7 +311,7 @@ test('audioFile：檔名包含聲音和文字，和 tools/make-audio.mjs 的 aud
   assert.equal(JLPT.audioFile('F', 'はい。'), `audio/jlpt/${audioKey('108|はい。')}.mp3`);
   assert.equal(JLPT.audioFile('N', 'はい。'), `audio/jlpt/${audioKey('30|はい。')}.mp3`);
   assert.notEqual(JLPT.audioFile('M', 'はい。'), JLPT.audioFile('F', 'はい。'), '同一句不同聲音是不同的檔');
-  assert.equal(JLPT.speechText('{今日|きょう}は　いい　{天気|てんき}です。'), 'きょうは いい てんきです。');
+  assert.equal(JLPT.speechText('{今日|きょう}は　いい　{天気|てんき}です。'), 'きょうはいいてんきです。', '空格會讓語音停頓，唸之前拿掉');
 });
 
 test('listeningLines：課題理解照腳本；發話表現、即時應答把選項唸出來', async () => {
@@ -319,7 +319,7 @@ test('listeningLines：課題理解照腳本；發話表現、即時應答把選
   const task = { type: 'task', script: [['N', 'しつもん'], ['M', 'a'], ['F', 'b'], ['N', 'しつもん']], choices: ['1', '2', '3', '4'] };
   assert.deepEqual([...JLPT.listeningLines(task).map(l => l[0])], ['N', 'M', 'F', 'N']);
   const utt = { type: 'utterance', speaker: 'F', script: [['N', 'レストランで　店の　人を　呼びます。何と　言いますか。']], choices: ['いらっしゃいませ。', 'すみません。', 'ごちそうさまでした。'] };
-  assert.deepEqual([...JLPT.listeningLines(utt).map(l => l.join('|'))], ['N|レストランで　店の　人を　呼びます。何と　言いますか。', 'F|一、いらっしゃいませ。', 'F|二、すみません。', 'F|三、ごちそうさまでした。']);
+  assert.deepEqual([...JLPT.listeningLines(utt).map(l => l.join('|'))], ['N|レストランで　店の　人を　呼びます。何と　言いますか。', 'F|いち、いらっしゃいませ。', 'F|に、すみません。', 'F|さん、ごちそうさまでした。']);
   const res = { type: 'response', speaker: 'M', script: [['F', 'お{国|くに}は　どちらですか。']], choices: ['あちらです。', 'アメリカです。', 'へやです。'] };
   assert.deepEqual([...JLPT.listeningLines(res).map(l => l[0])], ['F', 'M', 'M', 'M']);
 });
