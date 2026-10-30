@@ -43,7 +43,7 @@ test('genChoices：同一個種子結果相同（建置可重現），答案位�
 const q = (id, extra = {}) => ({ id, type: 'context', stem: 'きょうは　（　　）です。', choices: ['あめ', 'はれ', 'くもり', 'ゆき'], answer: 1, explain: '…', pool: 'practice', ...extra });
 const unreviewedBatch = { batch: 'u', level: 'N5', reviewed: null, questions: [q('unrev-1')] };
 const reviewedBatchWithOneBadQuestion = { batch: 'r', level: 'N5', reviewed: { by: 'x', at: '2026-10-30' }, questions: [q('ok-1'), q('bad-1', { answer: 9 }), { id: 'gen-1', type: 'kanji_reading', stem: 'あしたは　[[雨]]ですか。', gen: { word: '雨', reading: 'あめ' }, explain: '…', pool: 'practice' }] };
-const listeningBatch = { batch: 'l', level: 'N5', reviewed: { by: 'x', at: '2026-10-30' }, questions: [{ id: 'l-1', type: 'response', script: [['F', 'お{国|くに}は？']], choices: ['a', 'b', 'c'], answer: 1, explain: '…', pool: 'practice' }] };
+const listeningBatch = { batch: 'l', level: 'N5', reviewed: { by: 'x', at: '2026-10-30' }, questions: [{ id: 'l-1', type: 'response', speaker: 'M', script: [['F', 'お{国|くに}は？']], choices: ['a', 'b', 'c'], answer: 1, explain: '…', pool: 'practice' }] };
 
 test('buildLevel：沒審查的批次不輸出；有錯的題目回報錯誤；聽解缺錄音就不輸出', () => {
   const out = buildLevel([unreviewedBatch, reviewedBatchWithOneBadQuestion, listeningBatch], ctx(), { audioExists: () => false });
