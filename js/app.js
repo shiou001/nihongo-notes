@@ -456,6 +456,7 @@
     const p = phraseOfDay();
     return `${fresh.length ? `<section class="fresh-note">${icon('notebook')}<p>Notion 有新筆記，已排進課程：${fresh.map(u => `<a href="#/unit/${esc(u.key)}">${esc(u.title)}（${u.level} 第 ${u.index} 單元）</a>`).join('、')}</p></section>` : ''}
     <div class="today-play">
+      ${window.JLPTView ? JLPTView.todayCard() : ''}
       ${p ? `<article class="play-card phrase-day"><p class="eyebrow">今日一句</p><p class="pd-jp" lang="ja">${esc(p.jp)}</p><details><summary>看中文</summary><p>${esc(p.zh)}</p><p class="meta">${esc(p.from)}</p></details><button class="btn small" data-say="${esc(p.jp)}">${icon('speaker-high')} 聽</button></article>` : ''}
       ${nextLife ? `<a class="play-card life-next ${THEME_CLASS[nextLife.theme] || ''}" href="#/unit/${esc(nextLife.key)}">${themeGlyph(nextLife.theme, 'big')}<p class="eyebrow">生活日本・${esc(nextLife.theme)}</p><b>${esc(nextLife.title)}</b><small>${esc(nextLife.desc)}</small></a>` : ''}
       ${playUnit ? `<a class="play-card game-next" href="#/play/match?unit=${encodeURIComponent(playUnit.key)}">${icon('cards-three')}<p class="eyebrow">一分鐘小遊戲</p><b>配對：${esc(playUnit.title)}</b><small>把日文和意思連起來，挑戰最快紀錄。</small></a>` : ''}
@@ -913,12 +914,13 @@
     const seg = pathPart.split('/').filter(Boolean);
     const view = seg[0] || 'home';
     // 導覽列只有四項，其他頁面歸到對應的那一項
-    const navView = { home: 'home', course: 'course', map: 'course', unit: 'course', play: 'course', life: 'life', review: 'review', quiz: 'review', reference: 'reference', notes: 'reference', kana: 'reference', kanji: 'reference', voice: 'settings', sync: 'sync', settings: 'settings' }[view] || 'home';
+    const navView = { home: 'home', course: 'course', map: 'course', unit: 'course', play: 'course', life: 'life', jlpt: 'jlpt', review: 'review', quiz: 'review', reference: 'reference', notes: 'reference', kana: 'reference', kanji: 'reference', voice: 'settings', sync: 'sync', settings: 'settings' }[view] || 'home';
     document.body.classList.remove('nav-open');
     $('#nav-toggle')?.setAttribute('aria-expanded', 'false');
     quiz.qs = []; quiz.unitKey = ''; game.kind = '';
     document.querySelectorAll('nav.top a').forEach(a => { const active = a.dataset.view === navView; a.classList.toggle('active', active); if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     window.scrollTo(0, 0);
+    window.JLPTView?.leave();
     switch (view) {
       case 'map': case 'course': app().innerHTML = viewCourse(seg[1] || ''); break;
       case 'unit': app().innerHTML = viewUnit(decodeURIComponent(seg[1] || '')); break;
@@ -933,6 +935,7 @@
         else app().innerHTML = viewUnit(u.key);
         break;
       }
+      case 'jlpt': JLPTView.mount(app(), seg.slice(1), params); break;
       case 'reference': app().innerHTML = viewReference(); break;
       case 'notes': app().innerHTML = viewNotes(seg[1], params.get('q') || ''); break;
       case 'kana': app().innerHTML = viewKana(seg[1] || 'hira'); break;
@@ -974,7 +977,7 @@
     const cat = HEAD_CAT[view];
     if (cat && window.Art) head.insertAdjacentHTML('afterbegin', `<span class="head-cat">${Art.char(cat)}</span>`);
   }
-  const HEAD_CAT = { course: 'shiro', map: 'shiro', unit: 'walk', life: 'chatora', review: 'mike', reference: 'shiro', notes: 'shiro', kana: 'kuro', kanji: 'mike', quiz: 'maneki', settings: 'akubi', sync: 'walk', voice: 'chatora' };
+  const HEAD_CAT = { jlpt: 'maneki', course: 'shiro', map: 'shiro', unit: 'walk', life: 'chatora', review: 'mike', reference: 'shiro', notes: 'shiro', kana: 'kuro', kanji: 'mike', quiz: 'maneki', settings: 'akubi', sync: 'walk', voice: 'chatora' };
 
   document.addEventListener('submit', e => {
     if (e.target.id === 'study-profile') {

@@ -25,7 +25,7 @@ async function app(hash = '#/') {
     Voice: { onVoicesChanged() {}, speak() {}, voices: () => [], get: () => ({}) },
   });
   ctx.window = ctx;
-  const scripts = ['data/content.js', 'data/external.js', 'data/life.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/art.js', 'js/app.js'];
+  const scripts = ['data/content.js', 'data/external.js', 'data/life.js', 'js/data-merge.js', 'data/kanji.js', 'js/kanji-align.js', 'data/plan.js', 'data/teaching.js', 'js/progress.js', 'js/study.js', 'js/quiz.js', 'data/curriculum.js', 'js/curriculum.js', 'js/art.js', 'data/jlpt.js', 'js/jlpt-core.js', 'js/jlpt-figure.js', 'js/jlpt-player.js', 'js/jlpt-view.js', 'js/app.js'];
   for (const f of scripts) vm.runInContext(await readFile(new URL(f, root), 'utf8'), ctx, { filename: f });
   events.DOMContentLoaded();
   return { ctx, document,
@@ -254,4 +254,189 @@ test('已從題庫移除的舊題紀錄不會增加到期數', async () => {
   a.ctx.Progress.record('kw_removed_ambiguous_single_kanji', false, { now: Date.now() - 20 * 60 * 1000 });
   a.route('#/review');
   assert.equal(a.document.querySelector('.stats .stat .num').textContent, '0');
+});
+
+test('JLPT 專區：導覽列、首頁倒數、每日 20 題可作答並記錄、回報按鈕、今日卡片', async () => {
+  const a = await app('#/jlpt');
+  assert.ok(a.document.querySelector('nav.top a[data-view="jlpt"].active'));
+  assert.match(a.document.querySelector('main').textContent, /距離考試還有 [0-9]+ 天/);
+  assert.ok(a.document.querySelector('a[href="https://www.jlpt.jp/samples/sampleindex.html"]'), '官方範例題連結');
+  a.route('#/jlpt/daily');
+  const q = a.document.querySelector('.exam .q');
+  assert.ok(q && q.querySelectorAll('.bub').length >= 3);
+  a.click('.exam .q .bub[data-v="1"]');
+  assert.ok(a.document.querySelector('.exam .q .explain'), '練習模式作答後立刻顯示詳解');
+  assert.ok(Object.keys(a.ctx.Progress.load().items).some(k => k.startsWith('jlpt:')));
+  a.click('.exam [data-jlpt-report]');
+  assert.equal(Object.keys(a.ctx.Progress.jlpt().reports).length, 1);
+  a.route('#/');
+  assert.ok(a.document.querySelector('.play-card.jlpt-today'));
+  assert.ok(!a.document.querySelector('main').innerHTML.includes('undefined'));
+});
+
+test('JLPT 題本樣式：文字語彙題沒有 ruby；每日練習可以一路做完並記錄一次', async () => {
+  const a = await app('#/jlpt/daily');
+  for (const el of a.document.querySelectorAll('.exam .q[data-section="vocab"] .stem')) assert.equal(el.querySelector('ruby'), null);
+  for (let i = 0; i < 25 && a.document.querySelector('.exam .q .bub:not([disabled])'); i++) {
+    a.click('.exam .q .bub[data-v="2"]');
+    if (a.document.querySelector('[data-jlpt-next]')) a.click('[data-jlpt-next]');
+  }
+  assert.match(a.document.querySelector('main').textContent, /今天的 [0-9]+ 題做完了/);
+  assert.equal(a.ctx.Progress.load().sessions.filter(s => s.mode === 'jlpt-daily').length, 1);
+});
+
+test('JLPT 設定：可改考試日期與畢業門檻', async () => {
+  const a = await app('#/jlpt/settings');
+  a.submit('#jlpt-settings', [['target', 'N4'], ['examDate', '2027-12-05'], ['passPct', '0.85'], ['needed', '3']]);
+  const s = a.ctx.JLPT.settings();
+  assert.equal(s.examDate, '2027-12-05'); assert.equal(s.passPct, 0.85); assert.equal(s.needed, 3);
+});
+
+test('JLPT 文章題：每日練習裡文章只出現一次，方框號碼等於畫面上的題號', async () => {
+  const a = await app('#/jlpt/daily');
+  const J = a.ctx.JLPT, bank = J.bank('N5');
+  const tg = bank.questions.find(q => q.type === 'text_grammar');
+  assert.ok(tg, '題庫裡要有文章文法題');
+  // 把文章題排進今天的題目
+  const group = bank.questions.filter(q => q.passage === tg.passage).map(q => q.id);
+  a.ctx.localStorage.setItem('nihongo.jlpt.daily', JSON.stringify({ day: a.ctx.Progress.dayKey(), level: 'N5', ids: [bank.questions.find(q => q.type === 'context' && !q.example).id, ...group], i: 1, results: {}, ended: false }));
+  a.route('#/jlpt/daily');
+  assert.equal(a.document.querySelectorAll('.exam .passage').length, 1);
+  const no = a.document.querySelector('.exam .q .qno').textContent.trim();
+  assert.equal(a.document.querySelector('.exam .passage .box-no.current').textContent.trim(), no);
+  assert.ok(a.document.querySelector('.exam .passage table') || !/^\|/m.test(bank.passages[tg.passage].stem), '表格行（| 開頭）才會變成表格');
+});
+
+test('JLPT 模擬考：開始、大題標頭與例題、作答不顯示詳解、重新進入恢復、暫停、交出一科後不能回頭', async () => {
+  const a = await app('#/jlpt/mock');
+  const J = a.ctx.JLPT;
+  assert.ok(a.document.querySelector('[data-jlpt-start][data-kind="mini"]'));
+  assert.ok(a.document.querySelector('[data-jlpt-start][data-kind="full"]'));
+  assert.match(a.document.querySelector('main').textContent, /需要開聲音/);
+  a.click('[data-jlpt-start][data-kind="mini"]');
+  const at = J.attempt(); assert.ok(at && at.deadline > Date.now());
+  assert.match(a.document.querySelector('.exam-bar .timer').textContent.trim(), /^\d{2}:\d{2}$/);
+  assert.ok(a.document.querySelectorAll('#jlpt-exam .mondai-head').length >= 3, '每個大題都有標頭');
+  assert.ok(a.document.querySelector('#jlpt-exam .mondai-head .example .bub.on'), '例題塗好答案');
+  const q1 = a.document.querySelector('#jlpt-exam .q:not(.example)');
+  a.click(`#jlpt-exam .q[data-qid="${q1.dataset.qid}"] .bub[data-v="2"]`);
+  assert.equal(J.attempt().answers[q1.dataset.qid], 2);
+  assert.equal(a.document.querySelector('#jlpt-exam .explain'), null, '考試中不顯示詳解');
+  a.route('#/jlpt/mock');
+  assert.ok(a.document.querySelector(`#jlpt-exam .q[data-qid="${q1.dataset.qid}"] .bub.on[data-v="2"]`), '重新進入後答案還在');
+  a.click('[data-jlpt-pause]');
+  assert.equal(J.attempt().paused, true);
+  a.click('[data-jlpt-resume]');
+  assert.equal(J.attempt().paused, false); assert.equal(J.attempt().everPaused, true);
+  a.click('[data-jlpt-submit-section]');
+  assert.equal(J.attempt().sectionIndex, 1);
+  assert.ok([...a.document.querySelectorAll('#jlpt-exam .q:not(.example)')].every(q => q.dataset.section !== 'vocab'), '進到文法・讀解');
+  assert.equal(J.setAnswer(q1.dataset.qid, 3), false, '上一科不能改');
+});
+
+test('JLPT 模擬考：結束考試 → 記錄為放棄、不計入，回到開始畫面', async () => {
+  const a = await app('#/jlpt/mock');
+  a.click('[data-jlpt-start][data-kind="mini"]');
+  a.click('[data-jlpt-abandon]');
+  const m = a.ctx.Progress.jlpt().mocks;
+  assert.equal(m.length, 1); assert.equal(m[0].abandoned, true); assert.equal(m[0].counted, false);
+  assert.equal(a.ctx.JLPT.attempt(), null);
+  assert.ok(a.document.querySelector('[data-jlpt-start]'));
+});
+
+test('JLPT 成績頁：交完三科 → 估計分數與說明、計入畢業、逐題詳解與回報；首頁顯示本週已完成、成績連結；同週第二份不計入', async () => {
+  const a = await app('#/jlpt/mock');
+  a.click('[data-jlpt-start][data-kind="mini"]');
+  const q1 = a.document.querySelector('#jlpt-exam .q:not(.example)');
+  a.click(`#jlpt-exam .q[data-qid="${q1.dataset.qid}"] .bub[data-v="1"]`);
+  for (let i = 0; i < 3 && a.document.querySelector('[data-jlpt-submit-section]'); i++) a.click('[data-jlpt-submit-section]');
+  // 測試環境沒有聲音，聽解播不完：直接交出聽解這一科
+  a.ctx.JLPT.nextSection();
+  a.route('#/jlpt/mock');
+  const m = a.ctx.Progress.jlpt().mocks.at(-1);
+  assert.ok(m && !m.abandoned && m.result, '交卷後有紀錄');
+  assert.equal(a.ctx.JLPT.attempt(), null);
+  assert.equal(m.counted, true, '全新的模擬考題、有聽解、本週第一份 → 計入畢業');
+  a.route('#/jlpt/result/' + m.at);
+  const text = a.document.querySelector('main').textContent;
+  assert.match(text, /這是估計，官方用量尺分數，實際分數可能不同/);
+  assert.match(text, /計入畢業/);
+  assert.match(text, /聽解：約/);
+  assert.equal(a.document.querySelectorAll('#jlpt-result .q .explain').length, m.qids.length, '每題都有詳解');
+  assert.ok(a.document.querySelector('#jlpt-result [data-jlpt-listen]'), '成績頁的聽解題可以重聽');
+  a.click('#jlpt-result [data-jlpt-report]');
+  assert.equal(Object.keys(a.ctx.Progress.jlpt().reports).length, 1);
+  a.route('#/jlpt');
+  const home = a.document.querySelector('main').textContent;
+  assert.match(home, /本週模擬考：已完成/);
+  assert.doesNotMatch(home, /模擬考新題用完了/, '模擬考專用題還夠');
+  assert.ok(a.document.querySelector(`a[href="#/jlpt/result/${m.at}"]`));
+  assert.ok(a.document.querySelector('a[href="#/jlpt/mock"]'));
+  assert.ok(!a.document.querySelector('main').innerHTML.includes('undefined'));
+});
+
+// 聽解題要等 Task 14 才有真的題目：測試時先放幾題假的進題庫
+function addListening(ctx) {
+  const qs = ctx.NIHONGO_JLPT.levels.N5.questions;
+  const mk = (type, i, pool) => ({ id: `t-${type}-${pool}-${i}`, level: 'N5', type, section: 'listening', pool, rev: 1,
+    script: type === 'response' ? [['F', 'お{国|くに}は　どちらですか。']] : type === 'utterance' ? [['N', 'みせの　ひとを　よびます。なんと　いいますか。']] : [['N', 'しつもん'], ['M', 'はなし'], ['N', 'しつもん']],
+    speaker: type === 'utterance' || type === 'response' ? 'M' : undefined,
+    choices: type === 'utterance' || type === 'response' ? ['あちらです。', 'アメリカです。', 'へやです。'] : ['えき', 'がっこう', 'こうえん', 'びょういん'], answer: 2, explain: '…' });
+  for (const type of ['task', 'point', 'utterance', 'response']) { for (let i = 1; i <= 4; i++) qs.push(mk(type, i, 'mock')); for (let i = 1; i <= 2; i++) qs.push(mk(type, i, 'practice')); }
+}
+
+test('JLPT 聽解（考試模式）：開始鈕、不能暫停也不能提早交卷、即時應答只有メモ和 3 個圓圈、發話表現不印選項', async () => {
+  const a = await app('#/jlpt/mock');
+  addListening(a.ctx);
+  a.route('#/jlpt/mock');
+  a.click('[data-jlpt-start][data-kind="mini"]');
+  a.click('[data-jlpt-submit-section]'); a.click('[data-jlpt-submit-section]');
+  assert.equal(a.ctx.JLPT.currentSection(a.ctx.JLPT.attempt()).key, 'listening');
+  assert.ok(a.document.querySelector('[data-jlpt-listen-start]'));
+  assert.equal(a.document.querySelector('[data-jlpt-pause]'), null);
+  assert.equal(a.document.querySelector('[data-jlpt-submit-section]'), null);
+  assert.equal(a.document.querySelector('#jlpt-exam [data-jlpt-listen]'), null, '考試中沒有重播鈕');
+  const res = a.document.querySelector('#jlpt-exam .q[data-type="response"]:not(.example)');
+  assert.match(res.textContent, /メモ/); assert.equal(res.querySelectorAll('.bub').length, 3);
+  assert.equal(a.document.querySelector('#jlpt-exam .q[data-type="utterance"] .choices'), null);
+  assert.ok([...a.document.querySelectorAll('#jlpt-exam .q:not(.example) .bub')].every(b => b.disabled), '還沒開始播放前不能作答');
+});
+
+test('JLPT 聽解（練習模式）：有播放鈕；作答後顯示腳本，可以再聽一次', async () => {
+  const a = await app('#/jlpt/daily');
+  addListening(a.ctx);
+  const q = a.ctx.JLPT.bank('N5').questions.find(x => x.id === 't-task-practice-1');
+  a.ctx.localStorage.setItem('nihongo.jlpt.daily', JSON.stringify({ day: a.ctx.Progress.dayKey(), level: 'N5', ids: [q.id], i: 0, results: {}, ended: false }));
+  a.route('#/jlpt/daily');
+  assert.ok(a.document.querySelector('#jlpt-daily [data-jlpt-listen]'));
+  a.click('#jlpt-daily .q .bub[data-v="2"]');
+  assert.ok(a.document.querySelector('#jlpt-daily .explain .script'));
+  assert.match(a.document.querySelector('#jlpt-daily [data-jlpt-listen]').textContent, /再聽一次/);
+});
+
+test('JLPT 聽解：沒有離開頁面、一路播完 → 這份模擬考計入畢業（不會被誤判為中斷）', async () => {
+  const a = await app('#/jlpt/mock');
+  const ctx = a.ctx;
+  class FakeAudio { constructor(src) { this.src = src || ''; FakeAudio.made++; FakeAudio.last = this; } play() { return Promise.resolve(); } pause() {} }
+  FakeAudio.made = 0;
+  ctx.Audio = FakeAudio;
+  ctx.setTimeout = fn => { fn(); return 0; };
+  a.click('[data-jlpt-start][data-kind="mini"]');
+  a.click('[data-jlpt-submit-section]'); a.click('[data-jlpt-submit-section]');
+  a.click('[data-jlpt-listen-start]');
+  for (let i = 0; i < 2000 && ctx.JLPT.attempt(); i++) FakeAudio.last.onended();
+  const m = ctx.Progress.jlpt().mocks.at(-1);
+  assert.ok(m && !m.abandoned, '考完有紀錄');
+  assert.equal(m.interrupted, false);
+  assert.equal(m.counted, true);
+  assert.equal(FakeAudio.made, 1, '整段聽解只用一個 audio 元素（iPhone 只允許點過的那個元素播放）');
+});
+
+test('JLPT：同步來的模擬考資料不會被當成 HTML 插進頁面', async () => {
+  const a = await app('#/jlpt');
+  a.ctx.Progress.saveJlpt(j => j.mocks.push({ at: '"><img src=x id=evil>', level: 'N5', kind: 'mini', qids: [], answers: {}, counted: false, result: { total: { correct: '<b id=evil2>', n: 1, pct: 0 }, sections: {}, lk: { pct: 0, est: '<i id=evil3>', pass: false }, listen: null, estTotal: 0, estPass: null, byType: {} } }));
+  a.route('#/jlpt');
+  assert.equal(a.document.querySelector('#evil'), null);
+  a.route('#/jlpt/result/' + encodeURIComponent('"><img src=x id=evil>'));
+  assert.equal(a.document.querySelector('#evil2, #evil3'), null);
 });

@@ -225,6 +225,17 @@ nihongo-notes/
 - 頁尾註明 VOICEVOX:東北きりたん；部署 staging 加上 audio/。
 - 測試：錄音優先、切換裝置朗讀、沒錄音退回、清單裡每個檔案都存在。
 
+## 20. JLPT 考試專區（v0.15，2026-10-30）
+
+完整設計：`docs/superpowers/specs/2026-10-30-jlpt-exam-zone-design.md`；實作計畫：`docs/superpowers/plans/2026-10-30-jlpt-exam-zone.md`。
+
+- 目標：先練 N5，2027/7/4 考 N4。每日 20 題、週末小型模擬考、連續兩份計入的模擬考 ≥ 80% 且各科過最低分即畢業。
+- 擬真以官方資料為準（2020 年 12 月起的題數與時間、計分最低分、題本與聽解流程）。
+- 題庫：`jlpt-src/<級數>/*.json` 原稿 → `tools/build-jlpt.mjs` 檢查並建置 `data/jlpt.js`；只輸出已審查批次。題目分練習題與模擬考專用題。第一版 N5 共 251 題（含例題）：文字語彙、文法、讀解、聽解。
+- 每一批題目都經獨立審查者逐題檢查（`jlpt-src/REVIEW.md`），修正後再審到全部通過。
+- 聽解錄音：VOICEVOX No.7（旁白，非商業）／剣崎雌雄／東北きりたん，`tools/make-jlpt-audio.mjs` 逐句比對讀音，唸錯的句子不錄。插圖：程式畫的地圖／行事曆／時鐘，以及いらすとや情境圖（`tools/jlpt-img.mjs` 轉黑白）。
+- 程式：`js/jlpt-core.js`（純邏輯）、`js/jlpt-figure.js`、`js/jlpt-player.js`、`js/jlpt-view.js`；模擬考紀錄、回報、設定存在 `Progress.jlpt()` 並跨裝置同步。
+
 ## 19. 之後可擴充
 
 - 日本字形辨識題（氣→気）、同形異義詞（手紙＝信）、聲旁規律（青→晴清精請都唸 せい）。
