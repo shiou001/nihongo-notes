@@ -175,7 +175,8 @@ window.JLPT = (() => {
 
   // ── 每日 20 題：弱點題型、到期錯題、新題、聽解（規格 §6）。同一篇文章的題目整組出 ──
   function dailySet({ level = settings().level, now = Date.now(), count = 20, mix = { weak: 8, due: 6, fresh: 4, listening: 2 } } = {}) {
-    const eligible = bank(level).questions.filter(q => q.pool === 'practice' && !q.example && !isReported(q));
+    const mockSeen = new Set(P().jlpt().mocks.flatMap(m => m.qids || []));
+    const eligible = bank(level).questions.filter(q => (q.pool === 'practice' || mockSeen.has(q.id)) && !q.example && !isReported(q));
     const units = [], byPassage = new Map();
     for (const q of eligible) {
       if (!q.passage) { units.push([q]); continue; }
@@ -187,9 +188,10 @@ window.JLPT = (() => {
     const lastOf = u => Math.max(0, ...ustat(u).map(s => s.last || 0));
     const isListening = u => u[0].section === 'listening';
     const byId = (a, b) => (a[0].id < b[0].id ? -1 : 1);
-    const textUnits = units.filter(u => !isListening(u));
+    const isMock = u => u[0].pool === 'mock';
+    const textUnits = units.filter(u => !isListening(u) && !isMock(u));
 
-    const due = textUnits.filter(u => ustat(u).some(s => s.seen && s.due && s.due <= now))
+    const due = units.filter(u => !isListening(u)).filter(u => ustat(u).some(s => s.seen && s.due && s.due <= now))
       .sort((a, b) => Math.min(...ustat(a).map(s => s.due || Infinity)) - Math.min(...ustat(b).map(s => s.due || Infinity)) || byId(a, b));
     const ts = typeStats(level);
     const weakTypes = Object.keys(ts).filter(t => ts[t].pct !== null && TYPES[t].section !== 'listening').sort((a, b) => ts[a].pct - ts[b].pct || a.localeCompare(b));
@@ -200,7 +202,7 @@ window.JLPT = (() => {
     for (const u of freshSorted) { if (!perType.has(u[0].type)) perType.set(u[0].type, []); perType.get(u[0].type).push(u); }
     const fresh = [];
     for (let i = 0; [...perType.values()].some(l => i < l.length); i++) for (const l of perType.values()) if (i < l.length) fresh.push(l[i]);
-    const listening = units.filter(isListening).sort((a, b) => seen(a) - seen(b) || lastOf(a) - lastOf(b) || byId(a, b));
+    const listening = units.filter(u => isListening(u) && !isMock(u)).sort((a, b) => seen(a) - seen(b) || lastOf(a) - lastOf(b) || byId(a, b));
 
     const picked = new Set(), out = [];
     const take = (list, n) => {
@@ -213,7 +215,7 @@ window.JLPT = (() => {
     };
     take(due, mix.due); take(weak, mix.weak); take(fresh, mix.fresh); take(listening, mix.listening);
     // 不夠時依序用 新題、到期、弱點 補，最後用最久沒做的題目補滿
-    for (const list of [fresh, due, weak, [...units].sort((a, b) => lastOf(a) - lastOf(b) || byId(a, b))]) take(list, count);
+    for (const list of [fresh, due, weak, units.filter(u => !isMock(u)).sort((a, b) => lastOf(a) - lastOf(b) || byId(a, b))]) take(list, count);
     return out;
   }
 
@@ -334,7 +336,15 @@ window.JLPT = (() => {
     const d = new Date(date); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
-  const countedMocks = level => P().jlpt().mocks.filter(m => m.counted && m.level === level).sort((a, b) => a.at - b.at);
+  // 計入：當時判定計入，而且在合併後的紀錄裡仍是那週第一份、題目沒在更早的模擬考出現過
+  function countedMocks(level) {
+    const all = [...P().jlpt().mocks].sort((a, b) => a.at - b.at), weeks = new Set(), seen = new Set(), out = [];
+    for (const m of all) {
+      if (m.level === level && m.counted && !weeks.has(weekKey(new Date(m.at))) && !(m.qids || []).some(id => seen.has(id))) { weeks.add(weekKey(new Date(m.at))); out.push(m); }
+      for (const id of m.qids || []) seen.add(id);
+    }
+    return out;
+  }
   const passes = (m, s = settings()) => !!(m.result && m.result.total.pct >= s.passPct && m.result.lk?.pass && m.result.listen?.pass);
   // 畢業：最近 needed 份「計入」的模擬考都過
   function graduation(level = settings().level) {
@@ -356,12 +366,15 @@ window.JLPT = (() => {
     const mock = { at: now, level: plan.level, kind: plan.kind, qids, answers: a.answers, result, counted: !reasons.length, reasons, paused: !!a.everPaused, abandoned: false, interrupted: !!a.interrupted };
     P().saveJlpt(j => { j.mocks.push(mock); });
     clearAttempt();
-    if (graduation(plan.level).done && !P().jlpt().graduated[plan.level]) {
-      P().saveJlpt(j => { j.graduated[plan.level] = now; });
-      const next = LEVELS[rank(plan.level) - 1];
-      if (next && bank(next).questions.length) setSettings({ level: next });
-    }
+    checkGraduation(now);
     return mock;
+  }
+  // 記下畢業（同步合併後也會補記）；目前程度剛畢業、下一級有題庫 → 換到下一級（每級只自動換一次）
+  function checkGraduation(now = Date.now()) {
+    const level = settings().level;
+    if (graduation(level).done && !P().jlpt().graduated[level]) P().saveJlpt(j => { j.graduated[level] = now; });
+    const s = settings(), next = LEVELS[rank(level) + 1];
+    if (P().jlpt().graduated[level] && next && !(s.movedOn || []).includes(level) && bank(next).questions.length) setSettings({ level: next, movedOn: [...(s.movedOn || []), level] });
   }
   // 各題型還沒考過的模擬考專用題數
   function mockPoolLeft(level = settings().level) {
@@ -397,6 +410,6 @@ window.JLPT = (() => {
   return { LEVELS, TYPES, SECTIONS, PASSAGE_TYPES, renderStem, validate, textErrors, esc,
     DEFAULTS, settings, setSettings, bank, qid, daysLeft, isReported, report, typeStats, dailySet,
     assembleMock, attempt, saveAttempt, clearAttempt, startAttempt, timeLeft, pauseAttempt, resumeTimer, nextSection, setAnswer, resumeAttempt, currentSection, abandonAttempt,
-    score, weekKey, finishAttempt, graduation, mockPoolLeft, PASS_TOTAL,
+    score, weekKey, finishAttempt, graduation, countedMocks, checkGraduation, mockPoolLeft, PASS_TOTAL,
     voices, audioKey, audioFile, speechText, listeningLines, instructionLine };
 })();

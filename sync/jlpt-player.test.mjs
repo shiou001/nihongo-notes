@@ -72,3 +72,12 @@ test('player：檔案錯誤造成的 play() 失敗不算被擋（只跳過那一
   t.flush();
   assert.deepEqual(played, ['a.mp3', 'b.mp3']);
 });
+
+test('player：傳入 audio 元素就整段重用（換 src），不另外建立', async () => {
+  const P = await load(), au = fakeAudio(), t = fakeTimer();
+  const el = new au.A('');
+  P.play(['a.mp3', 'b.mp3'], { audio: el, Audio: au.A, setTimeout: t.set });
+  el.end(); t.flush();
+  assert.equal(au.list.length, 1, '只有一開始那個元素');
+  assert.deepEqual(au.played, ['a.mp3', 'b.mp3']);
+});

@@ -413,3 +413,30 @@ test('JLPT 聽解（練習模式）：有播放鈕；作答後顯示腳本，可
   assert.ok(a.document.querySelector('#jlpt-daily .explain .script'));
   assert.match(a.document.querySelector('#jlpt-daily [data-jlpt-listen]').textContent, /再聽一次/);
 });
+
+test('JLPT 聽解：沒有離開頁面、一路播完 → 這份模擬考計入畢業（不會被誤判為中斷）', async () => {
+  const a = await app('#/jlpt/mock');
+  const ctx = a.ctx;
+  class FakeAudio { constructor(src) { this.src = src || ''; FakeAudio.made++; FakeAudio.last = this; } play() { return Promise.resolve(); } pause() {} }
+  FakeAudio.made = 0;
+  ctx.Audio = FakeAudio;
+  ctx.setTimeout = fn => { fn(); return 0; };
+  a.click('[data-jlpt-start][data-kind="mini"]');
+  a.click('[data-jlpt-submit-section]'); a.click('[data-jlpt-submit-section]');
+  a.click('[data-jlpt-listen-start]');
+  for (let i = 0; i < 2000 && ctx.JLPT.attempt(); i++) FakeAudio.last.onended();
+  const m = ctx.Progress.jlpt().mocks.at(-1);
+  assert.ok(m && !m.abandoned, '考完有紀錄');
+  assert.equal(m.interrupted, false);
+  assert.equal(m.counted, true);
+  assert.equal(FakeAudio.made, 1, '整段聽解只用一個 audio 元素（iPhone 只允許點過的那個元素播放）');
+});
+
+test('JLPT：同步來的模擬考資料不會被當成 HTML 插進頁面', async () => {
+  const a = await app('#/jlpt');
+  a.ctx.Progress.saveJlpt(j => j.mocks.push({ at: '"><img src=x id=evil>', level: 'N5', kind: 'mini', qids: [], answers: {}, counted: false, result: { total: { correct: '<b id=evil2>', n: 1, pct: 0 }, sections: {}, lk: { pct: 0, est: '<i id=evil3>', pass: false }, listen: null, estTotal: 0, estPass: null, byType: {} } }));
+  a.route('#/jlpt');
+  assert.equal(a.document.querySelector('#evil'), null);
+  a.route('#/jlpt/result/' + encodeURIComponent('"><img src=x id=evil>'));
+  assert.equal(a.document.querySelector('#evil2, #evil3'), null);
+});

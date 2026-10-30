@@ -2,8 +2,9 @@
 // play(files, opts) 一句一句播，句間停 gapMs，最後留 tailMs 作答時間後呼叫 onEnd
 //   onIndex(i)：開始播第 i 句　onBlocked(i)：瀏覽器擋自動播放（手機常見），等使用者點一下再 resume()
 //   檔案讀不到就跳過那一句，不讓考試卡住
+//   audio：傳入同一個 audio 元素就一直換 src 重用（iPhone 只讓使用者點過、播過的那個元素自動播放）
 window.JLPTPlayer = (() => {
-  function play(files, { gapMs = 700, tailMs = 0, onIndex, onEnd, onBlocked, Audio = window.Audio, setTimeout = window.setTimeout } = {}) {
+  function play(files, { gapMs = 700, tailMs = 0, onIndex, onEnd, onBlocked, audio: shared = null, Audio = window.Audio, setTimeout = window.setTimeout } = {}) {
     let i = 0, audio = null, stopped = false, blockedAt = null;
     const next = () => {
       if (stopped) return;
@@ -14,7 +15,7 @@ window.JLPTPlayer = (() => {
       if (stopped) return;
       blockedAt = null;
       onIndex?.(i);
-      audio = new Audio(files[i]);
+      if (shared) { audio = shared; audio.src = files[i]; } else audio = new Audio(files[i]);
       audio.onended = next;
       audio.onerror = next;
       const p = audio.play();

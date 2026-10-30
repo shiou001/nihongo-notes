@@ -11,7 +11,14 @@ window.JLPTView = (() => {
 
   const fmtDate = iso => { const [y, m, d] = String(iso).split('-').map(Number); return `${y}/${m}/${d}`; };
   const byId = level => new Map(J().bank(level).questions.map(q => [q.id, q]));
-  const pct = x => `${Math.round(x * 100)}%`;
+  // 同步來的數字不直接信任：不是數字就當 0，避免被當成 HTML 插進頁面
+  const num = v => (Number.isFinite(+v) ? +v : 0);
+  const pct = x => `${Math.round(num(x) * 100)}%`;
+  // 計入與否用合併後的紀錄重新判斷（見 JLPT.countedMocks）
+  const isCounted = m => J().countedMocks(m.level).some(x => x.at === m.at);
+  // 整段聽解共用一個 audio 元素，第一次在使用者點「開始」時建立
+  let sharedAudio = null;
+  const audioEl = () => (sharedAudio ||= new window.Audio());
 
   // ── 題目（題本風格）──
   // mode：practice 每日練習（作答後立刻看詳解）／exam 考試模式（Task 8）
@@ -141,7 +148,7 @@ window.JLPTView = (() => {
     listen.running = true; listen.blocked = false;
     renderMock();
     document.querySelector('#jlpt-exam .q.current, #jlpt-exam .mondai-head.current')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    listen.player = JLPTPlayer.play(items[k].files, { tailMs: items[k].tail, onEnd: () => runItem(k + 1), onBlocked: () => { listen.blocked = true; renderMock(); } });
+    listen.player = JLPTPlayer.play(items[k].files, { audio: audioEl(), tailMs: items[k].tail, onEnd: () => runItem(k + 1), onBlocked: () => { listen.blocked = true; renderMock(); } });
   }
 
   // 一科的題目：依題型分成大題（もんだい１、２…），每個大題開頭有作答說明和例題；題號在這一科裡連續
@@ -175,7 +182,7 @@ window.JLPTView = (() => {
 
   function viewMock() {
     stopTimer();
-    let a = J().resumeAttempt();
+    let a = listen.running ? J().attempt() : J().resumeAttempt();
     if (a && !J().currentSection(a)) { finishMock(); a = null; }
     if (!a) return viewMockIntro();
     notice = '';
@@ -217,14 +224,14 @@ window.JLPTView = (() => {
     const r = m.result, s = J().settings();
     const passMark = (J().PASS_TOTAL || {})[m.level] || 80;
     const when = new Date(m.at).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' });
-    const sec = Object.entries(r.sections).filter(([, x]) => x.n).map(([k, x]) => `<li>${SECTION_NAME[k]}：${x.correct} / ${x.n}（${pct(x.pct)}）</li>`).join('');
-    const est = `<p>言語知識・讀解：約 <b>${r.lk.est}</b> / 120 分（最低 38 分）${r.lk.pass ? '　○ 過最低分' : '　× 沒過最低分'}</p>
-      ${r.listen ? `<p>聽解：約 <b>${r.listen.est}</b> / 60 分（最低 19 分）${r.listen.pass ? '　○ 過最低分' : '　× 沒過最低分'}</p>
-      <p>總分：約 <b>${r.estTotal}</b> / 180 分（及格 ${passMark} 分）　${r.estPass ? '<b>○ 估計合格</b>' : '<b>× 估計不合格</b>'}</p>` : '<p>聽解還沒開放，這次只算前兩科，不估計總分。</p>'}
+    const sec = Object.entries(r.sections).filter(([, x]) => x.n).map(([k, x]) => `<li>${SECTION_NAME[k]}：${num(x.correct)} / ${num(x.n)}（${pct(x.pct)}）</li>`).join('');
+    const est = `<p>言語知識・讀解：約 <b>${num(r.lk.est)}</b> / 120 分（最低 38 分）${r.lk.pass ? '　○ 過最低分' : '　× 沒過最低分'}</p>
+      ${r.listen ? `<p>聽解：約 <b>${num(r.listen.est)}</b> / 60 分（最低 19 分）${r.listen.pass ? '　○ 過最低分' : '　× 沒過最低分'}</p>
+      <p>總分：約 <b>${num(r.estTotal)}</b> / 180 分（及格 ${passMark} 分）　${r.estPass ? '<b>○ 估計合格</b>' : '<b>× 估計不合格</b>'}</p>` : '<p>聽解還沒開放，這次只算前兩科，不估計總分。</p>'}
       <p class="meta">${ESTIMATE_NOTE}。</p>`;
-    const counted = m.counted ? `<p><b>○ 計入畢業</b>（正確率 ${pct(r.total.pct)}，畢業門檻 ${pct(s.passPct)}）</p>` : `<p><b>不計入畢業</b>：${esc((m.reasons || []).join('；'))}</p>`;
+    const counted = isCounted(m) ? `<p><b>○ 計入畢業</b>（正確率 ${pct(r.total.pct)}，畢業門檻 ${pct(s.passPct)}）</p>` : `<p><b>不計入畢業</b>：${esc(m.counted ? '同步後發現同一週已有另一份計入的模擬考，或題目在別台裝置考過' : (m.reasons || []).join('；'))}</p>`;
     const types = Object.entries(r.byType).sort((a, b) => a[1].correct / a[1].n - b[1].correct / b[1].n)
-      .map(([t, o]) => `<li><span>${esc(J().TYPES[t].label)}</span><span class="bar" style="--p:${Math.round(o.correct / o.n * 100)}"></span><b>${o.correct}/${o.n}</b></li>`).join('');
+      .map(([t, o]) => `<li><span>${esc(Object.hasOwn(J().TYPES, t) ? J().TYPES[t].label : t)}</span><span class="bar" style="--p:${Math.round(num(o.correct) / num(o.n) * 100) || 0}"></span><b>${num(o.correct)}/${num(o.n)}</b></li>`).join('');
     const b = J().bank(m.level), map = new Map(b.questions.map(q => [q.id, q]));
     const shown = new Set();
     const review = m.qids.map((id, i) => {
@@ -235,26 +242,26 @@ window.JLPTView = (() => {
     }).join('');
     return `<section class="page-head" data-en="JLPT"><h1>模擬考成績</h1><p class="meta"><a href="#/jlpt">← JLPT 專區</a>・${esc(when)}・${m.kind === 'full' ? '全真' : '小型'}模擬考${m.paused ? '・有暫停' : ''}</p></section>
       <div class="jlpt-grid">
-        <section class="card"><h2>${icon('check-circle')} 正確率 ${pct(r.total.pct)}</h2><p>${r.total.correct} / ${r.total.n} 題</p><ul>${sec}</ul>${counted}</section>
+        <section class="card"><h2>${icon('check-circle')} 正確率 ${pct(r.total.pct)}</h2><p>${num(r.total.correct)} / ${num(r.total.n)} 題</p><ul>${sec}</ul>${counted}</section>
         <section class="card"><h2>${icon('chart-line')} 估計分數</h2>${est}</section>
         <section class="card"><h2>各題型</h2><ol class="weak-list">${types}</ol></section>
       </div>
-      <h2 class="review-title">逐題對答案</h2><p class="meta">答錯的題目會進入複習，之後出現在每日練習。</p>
+      <h2 class="review-title">逐題對答案</h2><p class="meta">答錯的題目會進入複習，到期後出現在每日練習（聽解題除外）。</p>
       <section class="exam" id="jlpt-result">${review}</section>`;
   }
 
   // 首頁：模擬考與畢業
   function mockHomeCard(s) {
-    const g = J().graduation(s.level), grad = Progress.jlpt().graduated;
+    const g = J().graduation(s.level), grad = Progress.jlpt().graduated, next = J().LEVELS[J().LEVELS.indexOf(s.level) + 1];
     const mocks = Progress.jlpt().mocks.filter(m => !m.abandoned && m.result);
     const thisWeek = mocks.some(m => J().weekKey(new Date(m.at)) === J().weekKey());
     const left = J().mockPoolLeft(s.level);
     const short = Object.keys(J().TYPES).some(t => J().TYPES[t].mini && (J().TYPES[t].full[s.level] || 0) && left[t] < J().TYPES[t].mini);
-    const last = g.last.map(m => `<li><a href="#/jlpt/result/${m.at}">${new Date(m.at).toLocaleDateString('zh-TW')}</a>　${pct(m.result.total.pct)}</li>`).join('');
-    const recent = mocks.slice(-5).reverse().map(m => `<li><a href="#/jlpt/result/${m.at}">${new Date(m.at).toLocaleDateString('zh-TW')}・${m.kind === 'full' ? '全真' : '小型'}</a>　${pct(m.result.total.pct)}${m.counted ? '' : '（不計入）'}</li>`).join('');
+    const last = g.last.map(m => `<li><a href="#/jlpt/result/${num(m.at)}">${new Date(m.at).toLocaleDateString('zh-TW')}</a>　${pct(m.result.total.pct)}</li>`).join('');
+    const recent = mocks.slice(-5).reverse().map(m => `<li><a href="#/jlpt/result/${num(m.at)}">${new Date(m.at).toLocaleDateString('zh-TW')}・${m.kind === 'full' ? '全真' : '小型'}</a>　${pct(m.result.total.pct)}${isCounted(m) ? '' : '（不計入）'}</li>`).join('');
     return `<section class="card"><h2>${icon('check-circle')} 畢業進度</h2><p>目前練習：<b>${esc(s.level)}</b>　目標：<b>${esc(s.target)}</b></p>
         <p class="meta">連續 ${s.needed} 份計入的模擬考答對 ${pct(s.passPct)} 以上，而且各科都過最低分，就畢業。</p>
-        ${grad[s.level] ? `<p><b>${esc(s.level)} 畢業了！</b>${J().bank(J().LEVELS[J().LEVELS.indexOf(s.level) - 1] || '').questions.length ? '' : `${esc(J().LEVELS[J().LEVELS.indexOf(s.level) - 1] || '')} 題庫準備中，先繼續練 ${esc(s.level)}。`}</p>` : ''}
+        ${grad[s.level] ? `<p><b>${esc(s.level)} 畢業了！</b>${next && !J().bank(next).questions.length ? `${esc(next)} 題庫準備中，先繼續練 ${esc(s.level)}。` : ''}</p>` : ''}
         ${last ? `<p>最近計入的模擬考：</p><ol>${last}</ol>` : '<p class="meta">還沒有計入的模擬考紀錄。</p>'}</section>
       <section class="card"><h2>${icon('notebook')} 模擬考</h2><p>本週模擬考：${thisWeek ? '已完成' : '未完成'}</p>
         ${short ? '<p class="notice-line">模擬考新題用完了：要補新的一批模擬考題，之後的模擬考才會計入畢業。</p>' : ''}
@@ -264,6 +271,7 @@ window.JLPTView = (() => {
 
   // ── 專區首頁 ──
   function viewHome() {
+    J().checkGraduation();
     const s = J().settings(), days = J().daysLeft();
     const count = days >= 0 ? `距離考試還有 ${days} 天（${fmtDate(s.examDate)}・${esc(s.target)}）` : `考試日期（${fmtDate(s.examDate)}）已經過了，請到設定更新下一次的考試日期。`;
     const hasBank = J().bank(s.level).questions.length > 0;
@@ -310,7 +318,7 @@ window.JLPTView = (() => {
     const q = J().bank(J().settings().level).questions.find(x => x.id === id) || Progress.jlpt().mocks.map(m => J().bank(m.level).questions.find(x => x.id === id)).find(Boolean);
     if (!q || typeof window.Audio !== 'function') return;
     stopPractice();
-    practicePlayer = JLPTPlayer.play(lineFiles(q), {});
+    practicePlayer = JLPTPlayer.play(lineFiles(q), { audio: audioEl() });
   }
   function examClick(e) {
     const start = e.target.closest('[data-jlpt-start]');

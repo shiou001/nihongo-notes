@@ -334,3 +334,33 @@ test('validate：課題理解、重點理解的腳本前後都要是旁白提問
   assert.ok(JLPT.validate({ ...base, type: 'response', choices: ['a', 'b', 'c'], script: [['F', 'q']] }, c()).some(e => /speaker/.test(e)));
   assert.ok(JLPT.validate({ ...base, type: 'task', script: [['N', 'q'], ['X', 'a'], ['N', 'q']] }, c()).some(e => /角色/.test(e)));
 });
+
+// ── 最終審查的修正 ──
+test('畢業後換到下一級：N5 → N4（有 N4 題庫時）；N4 題庫晚點才上線也會自動切換', async () => {
+  const b = bigMockBank();
+  const c = await load(b), J = c.JLPT;
+  takeMock(c, NOW, 1); takeMock(c, NOW + 7 * DAY, 1);
+  assert.ok(c.Progress.jlpt().graduated.N5 > 0);
+  assert.equal(J.settings().level, 'N5', '還沒有 N4 題庫');
+  b.levels.N4 = { questions: [{ id: 'n4-x', level: 'N4', type: 'context', section: 'vocab', pool: 'practice', rev: 1, stem: 'あ', choices: ['a', 'b', 'c', 'd'], answer: 1, explain: '…' }], passages: {} };
+  J.checkGraduation(NOW + 8 * DAY);
+  assert.equal(J.settings().level, 'N4', 'N4 題庫上線後切換');
+});
+
+test('同一週兩份計入的模擬考（兩台裝置同步後）只算第一份；題目和更早的模擬考重複的也不算', async () => {
+  const c = await load(bigMockBank()), J = c.JLPT;
+  const m1 = takeMock(c, NOW, 1);
+  // 另一台裝置同一週也考了一份，同步進來時已經標成計入
+  c.Progress.saveJlpt(j => j.mocks.push({ ...m1, at: NOW + DAY, counted: true }));
+  assert.equal(J.countedMocks('N5').length, 1);
+  assert.equal(J.graduation('N5').done, false);
+});
+
+test('dailySet：考過的模擬考題（答錯到期）會回到每日練習；沒考過的模擬考題不會', async () => {
+  const c = await load(makeMockBank()), J = c.JLPT;
+  const m = takeMock(c, NOW, 0);
+  const set = J.dailySet({ level: 'N5', now: NOW + 3600e3 });
+  const seen = new Set(m.qids);
+  assert.ok(set.some(q => seen.has(q.id)), '答錯的模擬考題會出現');
+  assert.ok(set.every(q => q.pool === 'practice' || seen.has(q.id)), '沒考過的模擬考題不出');
+});
