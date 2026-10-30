@@ -101,3 +101,19 @@
 .exam .script { background: #fff; border: 1px solid var(--e-line); padding: 6px 10px; margin: 6px 0; font-family: "BIZ UDPGothic", sans-serif; }
 .exam .script p { margin: 2px 0; }
 .exam .script b { display: inline-block; min-width: 2.6em; color: var(--e-gray); font-weight: 400; }
+
+/* 聽解插圖 */
+.exam .fig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.exam .fig-grid .cell { position: relative; border: 1.6px solid var(--e-ink); min-height: 130px; display: flex; align-items: center; justify-content: center; padding: 22px 8px 8px; background: #fff; }
+.exam .fig-grid .cell .n { position: absolute; left: 8px; top: 2px; font-size: 1.4rem; }
+.exam .fig-grid .things { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; }
+.exam .fig-grid .things img { height: 64px; width: auto; }
+.exam .fig-grid.clocks svg { width: 110px; height: 110px; }
+.exam .fig-map, .exam .fig-cal { border: 1.6px solid var(--e-ink); background: #fff; }
+.exam .fig-scene { position: relative; border: 1.6px solid var(--e-ink); background: #fff; display: flex; justify-content: center; overflow: hidden; }
+.exam .fig-scene img { max-height: 340px; width: auto; max-width: 100%; }
+.exam .arrow-pin { position: absolute; width: 0; height: 0; }
+.exam .arrow-pin svg.arrow { position: absolute; width: 52px; height: 52px; top: -48px; }
+.exam .arrow-pin svg.down-right { left: -48px; }
+.exam .arrow-pin svg.down-left { left: -4px; transform: scaleX(-1); }
+@media (max-width: 600px) { .exam .fig-grid .cell { min-height: 100px; } .exam .fig-grid .things img { height: 46px; } .exam .fig-scene img { max-height: 240px; } }

@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const W = {};
 new Function('window', readFileSync(path.join(root, 'js/jlpt-core.js'), 'utf8'))(W);
-const { JLPT } = W;
+new Function('window', readFileSync(path.join(root, 'js/jlpt-figure.js'), 'utf8'))(W);
+const { JLPT, JLPTFigure } = W;
 export const VOICES = { N: 30, M: 21, F: 108 }; // 旁白 No.7（アナウンス）、男 剣崎雌雄、女 東北きりたん
 
 // 可重現的雜湊（FNV-1a）：同一題每次建置的答案位置、干擾選項都一樣
@@ -109,6 +110,7 @@ export function genChoices(word, reading, type, vocab, kanji, seed = word) {
 
 // ── 建置一個級數 ──
 const PASSAGE_SECTION = { text_grammar: 'grammar', reading_short: 'reading', reading_mid: 'reading', info_search: 'reading' };
+//   imageExists(path) → 圖檔是否存在（插圖還沒做好的題目先不輸出）
 export function buildLevel(batches, ctx, { audioExists = () => false, imageExists = () => true } = {}) {
   const errors = [], warnings = [], questions = [], passages = {}, checkedPassages = new Set();
   for (const b of batches) for (const [pid, p] of Object.entries(b.passages || {})) {
@@ -142,10 +144,12 @@ export function buildLevel(batches, ctx, { audioExists = () => false, imageExist
           for (const e of JLPT.textErrors(p.stem, PASSAGE_SECTION[q.type] || 'reading', q.level, ctx)) report.push(`${b.batch}/passage ${q.passage}: ${e}`);
         }
       }
-      if (q.figure && !imageExists(q)) errs.push('插圖檔不存在');
+      // 插圖：先畫一次，種類或位置寫錯就是錯誤
+      if (q.figure) { try { JLPTFigure.render(q.figure); } catch (e) { errs.push(`插圖：${e.message}`); } }
       if (errs.length) { report.push(...errs.map(e => `${b.batch}/${q.id}: ${e}`)); continue; }
       if (!b.reviewed) continue;
       if (q.section === 'listening' && !audioExists(q)) continue;
+      if (q.figure && !JLPTFigure.files(q.figure).every(imageExists)) continue;
       questions.push({ ...q, batch: b.batch });
     }
   }
@@ -175,7 +179,8 @@ async function main() {
     for (const f of files) batches.push({ batch: f.replace(/\.json$/, ''), level, ...JSON.parse(await readFile(path.join(dir, f), 'utf8')) });
     // 聽解題：每一句台詞都要有錄音（tools/make-jlpt-audio.mjs），缺錄音的題目不輸出
     const audioExists = q => JLPT.listeningLines(q).every(([r, t]) => existsSync(path.join(root, JLPT.audioFile(r, t))));
-    const out = buildLevel(batches, ctx, { audioExists });
+    const imageExists = rel => existsSync(path.join(root, rel));
+    const out = buildLevel(batches, ctx, { audioExists, imageExists });
     for (const w of out.warnings) console.warn('警告（未審查）', w);
     for (const e of out.errors) console.error('錯誤', e);
     blocking += out.errors.length;

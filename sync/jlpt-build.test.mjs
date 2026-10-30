@@ -81,3 +81,16 @@ test('buildLevel：文章文法題要有 blank，而且文章裡要有對應的�
   assert.ok(out.errors.some(e => e.includes('t-2') && /方框/.test(e)));
   assert.ok(out.errors.some(e => e.includes('t-3') && /blank/.test(e)));
 });
+
+test('buildLevel：插圖畫不出來（kind 或 slot 錯）是錯誤；插圖檔還沒做好只是不輸出', () => {
+  const base = { type: 'task', script: [['N', 'q'], ['M', 'a'], ['N', 'q']], choices: ['a', 'b', 'c', 'd'], answer: 1, explain: '…', pool: 'practice' };
+  const b = { batch: 'f', level: 'N5', reviewed: { by: 'x', at: 'd' }, questions: [
+    { ...base, id: 'f-1', figure: { kind: 'photo' } },
+    { ...base, id: 'f-2', figure: { kind: 'map', crossings: 1, marks: [{ slot: '3Ra', n: 1 }] } },
+    { ...base, id: 'f-3', figure: { kind: 'objects', options: [[{ img: 'egg' }], [{ img: 'milk' }], [{ img: 'fish' }], [{ img: 'tea' }]] } },
+    { ...base, id: 'f-4', figure: { kind: 'clocks', options: ['7:00', '7:30', '8:00', '8:30'] } }] };
+  const out = buildLevel([b], ctx(), { audioExists: () => true, imageExists: f => !f.includes('objects') });
+  assert.ok(out.errors.some(e => e.includes('f-1')) && out.errors.some(e => e.includes('f-2')));
+  assert.ok(!out.errors.some(e => e.includes('f-3')), '缺圖不是錯誤');
+  assert.deepEqual(out.questions.map(q => q.id), ['f-4']);
+});
