@@ -1,4 +1,4 @@
-// sync-notion.mjs — 從 Notion API 抓取「日文學習筆記」根頁面下所有子頁面 → Markdown 快取 → data/content.js
+// sync-notion.mjs — 從 Notion API 抓取「日文學習筆記」根頁面下所有子頁面（子頁面裡的子頁面接在原位，見 notion-blocks.mjs） → Markdown 快取 → data/content.js
 //
 // 需要環境變數：
 //   NOTION_TOKEN         Notion 個人存取權杖（https://www.notion.so/developers/tokens，ntn_ 開頭）
@@ -12,7 +12,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { buildFromCache } from './build-data.mjs';
-import { richText } from './notion-richtext.mjs';
+import { blocksToMarkdown } from './notion-blocks.mjs';
 
 const TOKEN = process.env.NOTION_TOKEN;
 const ROOT = (process.env.NOTION_ROOT_PAGE_ID || '36dd7785-7287-819e-a17a-d9a1045dbdc3').replace(/-/g, '');
@@ -45,43 +45,6 @@ async function children(blockId) {
 }
 
 
-// Notion blocks → 我們的簡易 Markdown（與 parse-notion-md.mjs 對應）
-async function blocksToMarkdown(blocks, depth = 0) {
-  const lines = [];
-  for (const b of blocks) {
-    const t = b.type, d = b[t];
-    switch (t) {
-      case 'heading_1': lines.push(`# ${richText(d.rich_text)}`); break;
-      case 'heading_2': lines.push(`## ${richText(d.rich_text)}`); break;
-      case 'heading_3': lines.push(`### ${richText(d.rich_text)}`); break;
-      case 'paragraph': { const s = richText(d.rich_text); if (s) lines.push(s); break; }
-      case 'quote':
-      case 'callout': lines.push(`> ${(d.icon?.emoji ? d.icon.emoji + ' ' : '')}${richText(d.rich_text)}`); break;
-      case 'bulleted_list_item':
-      case 'numbered_list_item': lines.push(`- ${richText(d.rich_text)}`); break;
-      case 'divider': lines.push('---'); break;
-      case 'table': {
-        const rows = await children(b.id);
-        lines.push(`<table header-row="${d.has_column_header ? 'true' : 'false'}">`);
-        for (const r of rows) lines.push('<tr>' + r.table_row.cells.map(c => `<td>${richText(c)}</td>`).join('') + '</tr>');
-        lines.push('</table>');
-        break;
-      }
-      case 'child_page': break; // 子頁面另外處理
-      case 'toggle': {
-        lines.push(richText(d.rich_text));
-        if (b.has_children) lines.push(...await blocksToMarkdown(await children(b.id), depth + 1));
-        break;
-      }
-      default: break;
-    }
-    if (b.has_children && !['table', 'toggle', 'child_page'].includes(t)) {
-      lines.push(...await blocksToMarkdown(await children(b.id), depth + 1));
-    }
-  }
-  return lines;
-}
-
 async function main() {
   console.log('🔄 讀取 Notion 根頁面…');
   const rootBlocks = await children(ROOT);
@@ -94,7 +57,7 @@ async function main() {
     const title = cp.child_page.title.replace(/^[^\w一-鿿]+/, '').trim(); // 去掉開頭 emoji
     const icon = page.icon?.emoji || '';
     console.log(`  📄 ${icon} ${title}`);
-    const body = await blocksToMarkdown(await children(cp.id));
+    const body = await blocksToMarkdown(await children(cp.id), children);
     const md = ['---', `id: ${cp.id}`, `title: ${title}`, `icon: ${icon}`, `edited: ${page.last_edited_time}`, '---', ...body, ''].join('\n');
     await writeFile(path.join(cacheDir, `${cp.id}.md`), md, 'utf8');
   }

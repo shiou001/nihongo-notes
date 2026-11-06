@@ -125,3 +125,34 @@ test('真實筆記：連體修飾段落的五張表都會出題，專用規則�
   assert.ok(content.drills.every(d => d.id.startsWith('d_') && d.prompt && d.answer && d.group));
   assert.ok(!content.drills.some(d => d.source.includes('單字分級')), '單字表交給單字規則');
 });
+
+// ── 子頁面（2026-10-29 文法筆記拆成 9 個子頁面後，同步只抓到目錄、文法題全不見）──
+test('blocksToMarkdown：子頁面接在原位，略過子頁面開頭的導航與索引，段落和表格都在', async () => {
+  const { blocksToMarkdown } = await import('./notion-blocks.mjs');
+  const rt = (s, bold = false) => [{ plain_text: s, annotations: { bold } }];
+  const tableRows = rows => rows.map(cells => ({ type: 'table_row', table_row: { cells: cells.map(c => rt(c)) } }));
+  const tree = {
+    root: [
+      { type: 'paragraph', paragraph: { rich_text: rt('🧭 快速導航', true) } },
+      { type: 'bulleted_list_item', bulleted_list_item: { rich_text: rt('回到總覽') } },
+      { type: 'divider', divider: {} },
+      { id: 'p1', type: 'child_page', child_page: { title: '📌 助詞' } },
+      { id: 'p2', type: 'child_page', child_page: { title: '🔢 數字' } },
+    ],
+    p1: [
+      { type: 'paragraph', paragraph: { rich_text: rt('🧭 快速導航', true) } },
+      { type: 'bulleted_list_item', bulleted_list_item: { rich_text: rt('文法筆記') } },
+      { type: 'table_of_contents', table_of_contents: {} },
+      { type: 'heading_2', heading_2: { rich_text: rt('其他常用助詞') } },
+      { id: 't1', type: 'table', has_children: true, table: { has_column_header: true } },
+    ],
+    t1: tableRows([['句型', '意思'], ['〜は', '主題']]),
+    p2: [{ type: 'paragraph', paragraph: { rich_text: rt('一、二、三') } }],
+  };
+  const lines = await blocksToMarkdown(tree.root, async id => tree[id] || []);
+  const i = lines.indexOf('## 其他常用助詞');
+  assert.ok(i > 0, '子頁面的段落標題在');
+  assert.ok(!lines.slice(i).includes('- 文法筆記'), '子頁面開頭的導航略過');
+  assert.ok(lines.includes('<tr><td>〜は</td><td>主題</td></tr>'), '子頁面的表格在');
+  assert.ok(lines.includes('## 數字') && lines.includes('一、二、三'), '沒有標題的子頁面用頁名當標題');
+});
