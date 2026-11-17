@@ -18,7 +18,7 @@ const root = path.resolve(here, '..');
 export const KANJI_SOURCES = [
   { name: 'KANJIDIC（EDRDG）', url: 'https://www.edrdg.org/wiki/index.php/KANJIDIC_Project', license: 'CC BY-SA 4.0' },
   { name: 'kanji-data（David Gouveia）', url: 'https://github.com/davidluzgouveia/kanji-data', license: 'MIT，資料依原始來源授權' },
-  { name: 'JLPT Resources（Jonathan Waller）', url: 'http://www.tanos.co.uk/jlpt/', license: 'CC BY' },
+  { name: 'JLPT Resources（Jonathan Waller）', url: 'https://web.archive.org/web/20260904233016/http://www.tanos.co.uk/jlpt/', license: 'CC BY' },
   { name: 'OpenCC 日本新字體對照', url: 'https://github.com/BYVoid/OpenCC', license: 'Apache-2.0' },
 ];
 

@@ -3,7 +3,7 @@
 // 來源資料（放在 repo 裡，方便追蹤變動）：
 //   sync/external/jamsinclair/n5.csv、n4.csv …
 //     出自 https://github.com/jamsinclair/open-anki-jlpt-decks （MIT）
-//     原始單字表出自 Jonathan Waller 的 http://www.tanos.co.uk/jlpt/ （CC BY，需註明出處）
+//     原始單字表出自 Jonathan Waller 的 https://web.archive.org/web/20260904233016/http://www.tanos.co.uk/jlpt/ （CC BY，需註明出處）
 //   sync/external/zh-tw.*.tsv（每級一個檔，例如 zh-tw.n5.tsv）
 //     中文解釋，由 AI 依日文與英文解釋翻成繁體中文。格式：單字<TAB>讀音<TAB>中文
 //
@@ -21,7 +21,7 @@ const root = path.resolve(here, '..');
 const extDir = path.join(here, 'external');
 
 export const SOURCES = [
-  { name: 'JLPT Resources（Jonathan Waller）', url: 'http://www.tanos.co.uk/jlpt/', license: 'CC BY' },
+  { name: 'JLPT Resources（Jonathan Waller）', url: 'https://web.archive.org/web/20260904233016/http://www.tanos.co.uk/jlpt/', license: 'CC BY' },
   { name: 'open-anki-jlpt-decks（jamsinclair）', url: 'https://github.com/jamsinclair/open-anki-jlpt-decks', license: 'MIT' },
 ];
 

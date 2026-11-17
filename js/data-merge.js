@@ -17,7 +17,7 @@
     id: 'external-vocab', title: 'JLPT 公開單字', icon: '🌐', edited: X.builtAt, external: true,
     sections: [
       { heading: '關於這份資料', level: 2, blocks: [
-        { type: 'para', text: '單字、讀音與英文解釋來自 [tanos.co.uk](http://www.tanos.co.uk/jlpt/) 的 JLPT 單字表（CC BY），經 [open-anki-jlpt-decks](https://github.com/jamsinclair/open-anki-jlpt-decks) 整理。' },
+        { type: 'para', text: '單字、讀音與英文解釋來自 [tanos.co.uk](https://web.archive.org/web/20260904233016/http://www.tanos.co.uk/jlpt/) 的 JLPT 單字表（CC BY；原網站已停止，連結是網頁存檔），經 [open-anki-jlpt-decks](https://github.com/jamsinclair/open-anki-jlpt-decks) 整理。' },
         { type: 'quote', text: '中文解釋是 AI 翻譯的，可能有不精確的地方。測驗答完會同時顯示英文原文，可以對照。' },
       ] },
       ...levels.map(l => ({ heading: `🌟 ${l}`, level: 2, blocks: [

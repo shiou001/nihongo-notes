@@ -9,7 +9,7 @@
 | 檔案 | `n5.csv`、`n4.csv`，欄位 expression, reading, meaning, tags, guid |
 | 取自 | https://github.com/jamsinclair/open-anki-jlpt-decks `src/`，commit `1ad66734417aca9dbcca6b2d5ee440cb13ab3ba0`，2026-09-14 下載 |
 | 整理者授權 | MIT |
-| 原始出處 | Jonathan Waller 的 JLPT Resources，http://www.tanos.co.uk/jlpt/ |
+| 原始出處 | Jonathan Waller 的 JLPT Resources，http://www.tanos.co.uk/jlpt/（2026-11 起網域失效，存檔：https://web.archive.org/web/20260904233016/http://www.tanos.co.uk/jlpt/）|
 | 原始授權 | Creative Commons BY：可自由使用，包含商業用途，但要註明出處並附連結 |
 
 網站頁尾和「🌐 JLPT 公開單字」頁都有註明出處，改版時請保留。
